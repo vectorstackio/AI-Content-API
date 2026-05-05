@@ -1,0 +1,120 @@
+// app/api/query/route.ts
+
+import OpenAI from 'openai'
+import { Pinecone } from '@pinecone-database/pinecone'
+
+import { NextRequest, NextResponse } from 'next/server'
+
+import config from '@/lib/config'
+import * as constants from '@/lib/constants'
+
+const openai = new OpenAI({
+  apiKey: config.app.openAiKey,
+})
+
+const pinecone = new Pinecone({
+  apiKey: config.app.pineconeApiKey,
+})
+
+const index = pinecone.index(config.app.pineconeIndexName)
+
+type QueryResponse =
+  | { success: true; answer: string; context: string[] }
+  | { success: false; error: string }
+
+export async function POST(req: NextRequest): Promise<NextResponse<QueryResponse>> {
+  try {
+    const body = await req.json().catch(() => null)
+
+    const question =
+      typeof body?.question === 'string' && body.question.trim().length > 0
+        ? body.question
+        : null
+
+    if (!question) {
+      return NextResponse.json(
+        { success: false, error: 'Question is required' },
+        { status: 400 }
+      )
+    }
+
+    // 1. Embed the question
+    const queryEmbedding = await openai.embeddings.create({
+      model: constants.EMBEDDING_MODEL,
+      input: question,
+    })
+    const embedding = queryEmbedding.data[0].embedding
+    if (!embedding) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to create embedding' },
+        { status: 500 }
+      )
+    }
+
+    // 2. Query Pinecone
+    const searchRes = await index.query({
+      vector: queryEmbedding.data[0].embedding,
+      topK: 3,
+      includeMetadata: true,
+    })
+
+    const contextTexts = searchRes.matches?.map((m) => String(m.metadata?.text || '')) ?? []
+    if (!contextTexts.length || !contextTexts.some(Boolean)) {
+      return NextResponse.json({
+        success: true,
+        answer: 'I don\'t know',
+        context: [],
+      })
+    }
+
+    const context = contextTexts.join('\n')
+
+    // 3. Ask OpenAI with context
+    const completion = await openai.responses.create({
+      model: constants.CHAT_MODEL,
+      input: `
+You are a helpful assistant. Answer the question using ONLY the context below.
+If the answer is not in the context, say 'I don't know'.
+
+Context:
+${context}
+
+Question:
+${question}
+      `
+    })
+
+    const answer = completion.output_text
+
+    if (!answer) {
+      return NextResponse.json(
+        { success: false, error: 'No answer returned' },
+        { status: 502 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      answer,
+      context: contextTexts,
+    })
+  } catch(err) {
+    //console.error('Query error:', err)
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+
+}
+
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    data: 'Query',
+  })
+}
