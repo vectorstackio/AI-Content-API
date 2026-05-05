@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import config from '@/lib/config'
 import * as constants from '@/lib/constants'
+//import { deleteAll } from '@/lib/pinecone'
 
 const openai = new OpenAI({
   apiKey: config.app.openAiKey,
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<QueryResponse
       includeMetadata: true,
     })
 
-    const contextTexts = searchRes.matches?.map((m) => String(m.metadata?.text || '')) ?? []
+    const contextTexts = searchRes.matches?.map((m) => String(m.metadata?.chunk || '')) ?? []
     if (!contextTexts.length || !contextTexts.some(Boolean)) {
       return NextResponse.json({
         success: true,
@@ -92,6 +93,8 @@ ${question}
         { status: 502 }
       )
     }
+
+    //await deleteAll()
 
     return NextResponse.json({
       success: true,
