@@ -29,11 +29,20 @@ export async function POST(req: NextRequest) {
 
     const result = await ingestUrl(url, userType)
 
-    return NextResponse.json({
-      success: true,
-      message: `URL ${url} successfully ingested`,
-      ...result,
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        message: `URL ${url} successfully ingested`,
+        ...result,
+      },
+      {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      }
+    )
   } catch (err: unknown) {
     return NextResponse.json(
       {
@@ -43,6 +52,17 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
 }
 
 export async function GET() {
