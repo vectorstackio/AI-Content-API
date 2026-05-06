@@ -1,10 +1,12 @@
 // lib/pinecone/index.ts
 
-import { Pinecone } from '@pinecone-database/pinecone'
+import { Pinecone, RecordMetadata } from '@pinecone-database/pinecone'
 
 import config from '@/lib/config'
 
-import type { RecordMetadata } from '@pinecone-database/pinecone'
+type DeleteByFilter = {
+  filter: Partial<Record<keyof RecordMetadata, unknown>>
+}
 
 const pinecone = new Pinecone({
   apiKey: config.app.pineconeApiKey,
@@ -24,7 +26,7 @@ export async function upsertVectors(params: {
   })
 }
 
-export const deleteVectors = async (filters: unknown) => {
+export const deleteVectors = async (filters: DeleteByFilter) => {
   await index.deleteMany(filters)
 }
 
