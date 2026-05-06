@@ -16,6 +16,9 @@ const config = {
     openAiKey: requireEnv('OPENAI_API_KEY'),
     pineconeApiKey: requireEnv('PINECONE_API_KEY'),
     pineconeIndexName: requireEnv('PINECONE_INDEX_NAME'),
+  },
+  db: {
+    url: process.env.DB_URL
   }
 }
 
