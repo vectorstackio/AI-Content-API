@@ -7,6 +7,7 @@ const fields = {
   url: { type: String, required: true },
   content: { type: String, required: true },
   contentHash: { type: String, required: true },
+  userType: { type: String, required: true },
 }
 
 const HubAiUrlsSchema = new Schema(

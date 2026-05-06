@@ -24,6 +24,10 @@ export async function upsertVectors(params: {
   })
 }
 
+export const deleteVectors = async (filters: unknown) => {
+  await index.deleteMany(filters)
+}
+
 export const deleteAll = async () => {
   //console.log('Deleting all vectors')
   await index.deleteMany({ filter: { url: { $exists: true } } })

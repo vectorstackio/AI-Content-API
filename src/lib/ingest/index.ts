@@ -1,15 +1,31 @@
 // lib/ingest/index.ts
 
 import crypto from 'crypto'
+import { Document } from 'mongoose'
 
 import { scrapeUrl } from '@/lib/scrape'
 import { chunkText } from '@/lib/chunk'
 import { embedChunks } from '@/lib/embed'
-import { upsertVectors } from '@/lib/pinecone'
+import { upsertVectors, deleteVectors } from '@/lib/pinecone'
 import { dbConnect } from '@/lib/db'
 import HubAiUrl from '@/lib/db/models/hubAiUrl.model'
 
-export const ingestUrl = async (url: string) => {
+type UserType = 'pupil' | 'teacher' | 'tutor'
+
+interface DbRecord extends Document {
+  url: string
+  content: string
+  contentHash: string
+  userType: string
+}
+
+interface CheckUrlExistsResult {
+  exists: boolean
+  unchanged: boolean
+  record?: DbRecord
+}
+
+export const ingestUrl = async (url: string, userType: UserType) => {
   if (!url) throw new Error('URL is required')
 
   // 1. Scrape
@@ -19,57 +35,81 @@ export const ingestUrl = async (url: string) => {
     throw new Error('No usable content scraped from URL')
   }
 
-  // 2. Chunk
+  // 2. Check for existing URL
+  await dbConnect()
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  const contentHash = createHash(normalized)
+  const result = await checkUrlExists(url, userType, contentHash)
+  if (result.exists) {
+    if (result.unchanged) throw new Error('The content of the URL has not changed')
+    await deleteVectors({
+      filter: {
+        url: { $eq: url },
+        userType: { $eq: userType },
+      },
+    })
+  }
+
+  // 3. Chunk
   const chunks = chunkText(text)
 
   if (!chunks.length) {
     throw new Error('No chunks generated from content')
   }
 
-  // 3. Embed
+  // 4. Embed
   const embeddings = await embedChunks(chunks)
 
-  // 4. Upsert to Pinecone
+  // 5. Upsert to Pinecone
   const vectors = chunks.map((chunk, i) => ({
-    id: `${url}-chunk-${i}`,
+    id: `${url}-${contentHash}-chunk-${i}`,
     values: embeddings[i],
     metadata: {
       url,
       chunk,
       chunkIndex: i,
+      contentHash,
+      userType,
     },
   }))
 
   await upsertVectors({ vectors })
-  await updateDb(url, text)
+  await updateDb(url, text, contentHash, userType, result.record ?? null)
 
   return {
     chunks: chunks.length,
   }
 }
 
-const updateDb = async (url: string, content: string) => {
-  const createHash = (text: string) => {
-    return crypto.createHash('sha256').update(text).digest('hex')
-  }
+const createHash = (text: string) => {
+  return crypto.createHash('sha256').update(text).digest('hex')
+}
 
-  const createHubAiUrl = async (url: string, content: string, contentHash: string) => {
-    const hubAiUrl = new HubAiUrl({ url, content, contentHash })
-    await hubAiUrl.save()
-    return hubAiUrl
-  }
-
-  await dbConnect()
-  const contentHash = createHash(content)
-  const existing = await HubAiUrl.findOne({ url })
+const checkUrlExists = async (url: string, userType: UserType, contentHash: string): Promise<CheckUrlExistsResult> => {
+  const existing = await HubAiUrl.findOne({ url, userType }) as DbRecord | null
   if (existing) {
     if (existing.contentHash === contentHash) {
-      throw new Error('The content of URL has not changed')
+      return { exists: true, unchanged: true }
     }
+    return { exists: true, unchanged: false, record: existing }
+  } else {
+    return { exists: false, unchanged: false }
+  }
+}
+
+const updateDb = async (url: string, content: string, contentHash: string, userType: string, existing: DbRecord | null = null) => {
+  if (existing) {
     existing.content = content
     existing.contentHash = contentHash
+    existing.userType = userType
     await existing.save()
     return existing
   }
-  return createHubAiUrl(url, content, contentHash)
+  return createRecord(url, content, contentHash, userType)
+}
+
+const createRecord = async (url: string, content: string, contentHash: string, userType: string) => {
+  const hubAiUrl = new HubAiUrl({ url, content, contentHash, userType })
+  await hubAiUrl.save()
+  return hubAiUrl
 }

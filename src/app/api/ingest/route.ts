@@ -22,7 +22,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const result = await ingestUrl(url)
+    const userType =
+      typeof body?.userType === 'string' && body.userType.trim().length > 0
+        ? body.userType.trim()
+        : null
+
+    const result = await ingestUrl(url, userType)
 
     return NextResponse.json({
       success: true,
