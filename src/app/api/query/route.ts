@@ -39,6 +39,20 @@ export async function POST(req: NextRequest): Promise<NextResponse<QueryResponse
       )
     }
 
+    const userType =
+      body?.userType === 'pupil' ||
+        body?.userType === 'teacher' ||
+        body?.userType === 'tutor'
+        ? body.userType
+        : null
+
+    if (!userType) {
+      return NextResponse.json(
+        { success: false, error: 'userType is required' },
+        { status: 400 }
+      )
+    }
+
     // 1. Embed the question
     const queryEmbedding = await openai.embeddings.create({
       model: constants.EMBEDDING_MODEL,
@@ -57,6 +71,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<QueryResponse
       vector: queryEmbedding.data[0].embedding,
       topK: 3,
       includeMetadata: true,
+      filter: {
+        userType: { $eq: userType },
+      },
     })
 
     const contextTexts = searchRes.matches?.map((m) => String(m.metadata?.chunk || '')) ?? []
