@@ -7,6 +7,12 @@ import { ingestUrl } from '@/lib/ingest'
 
 export const runtime = 'nodejs'
 
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
@@ -51,7 +57,10 @@ export async function POST(req: NextRequest) {
           success: false,
           error: err.message,
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers
+        }
       )
     }
 
@@ -61,7 +70,10 @@ export async function POST(req: NextRequest) {
           success: false,
           error: err.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+          headers
+        }
       )
     }
 
@@ -70,7 +82,7 @@ export async function POST(req: NextRequest) {
         success: false,
         error: 'Ingestion failed',
       },
-      { status: 500 }
+      { status: 500, headers }
     )
   }
 }
