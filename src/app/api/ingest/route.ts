@@ -1,6 +1,7 @@
 // app/api/ingest/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
+import { ClientError } from '@/lib/error'
 
 import { ingestUrl } from '@/lib/ingest'
 
@@ -44,10 +45,30 @@ export async function POST(req: NextRequest) {
       }
     )
   } catch (err: unknown) {
+    if (err instanceof ClientError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: err.message,
+        },
+        { status: 400 }
+      )
+    }
+
+    if (err instanceof Error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: err.message,
+        },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'Ingestion failed',
+        error: 'Ingestion failed',
       },
       { status: 500 }
     )

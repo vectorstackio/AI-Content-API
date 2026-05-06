@@ -8,6 +8,7 @@ import { chunkText } from '@/lib/chunk'
 import { embedChunks } from '@/lib/embed'
 import { upsertVectors, deleteVectors } from '@/lib/pinecone'
 import { dbConnect } from '@/lib/db'
+import { ClientError } from '@/lib/error'
 import HubAiUrl from '@/lib/db/models/hubAiUrl.model'
 
 type UserType = 'pupil' | 'teacher' | 'tutor'
@@ -26,13 +27,13 @@ interface CheckUrlExistsResult {
 }
 
 export const ingestUrl = async (url: string, userType: UserType) => {
-  if (!url) throw new Error('URL is required')
+  if (!url) throw new ClientError('URL is required')
 
   // 1. Scrape
   const text = await scrapeUrl(url)
 
   if (!text || text.length < 50) {
-    throw new Error('No usable content scraped from URL')
+    throw new ClientError('No usable content scraped from URL')
   }
 
   // 2. Check for existing URL
@@ -41,7 +42,7 @@ export const ingestUrl = async (url: string, userType: UserType) => {
   const contentHash = createHash(normalized)
   const result = await checkUrlExists(url, userType, contentHash)
   if (result.exists) {
-    if (result.unchanged) throw new Error('The content of the URL has not changed')
+    if (result.unchanged) throw new ClientError('The content of the URL has not changed')
     await deleteVectors({
       filter: {
         url: { $eq: url },
@@ -54,7 +55,7 @@ export const ingestUrl = async (url: string, userType: UserType) => {
   const chunks = chunkText(text)
 
   if (!chunks.length) {
-    throw new Error('No chunks generated from content')
+    throw new ClientError('No chunks generated from content')
   }
 
   // 4. Embed
