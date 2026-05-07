@@ -43,47 +43,26 @@ export async function POST(req: NextRequest) {
         ...result,
       },
       {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        headers
       }
     )
   } catch (err: unknown) {
-    if (err instanceof ClientError) {
+    const getErrorResponse = (status: number, error: string) => {
       return NextResponse.json(
         {
           success: false,
-          error: err.message,
+          error,
         },
         {
-          status: 400,
+          status,
           headers
         }
       )
     }
 
-    if (err instanceof Error) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: err.message,
-        },
-        {
-          status: 500,
-          headers
-        }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ingestion failed',
-      },
-      { status: 500, headers }
-    )
+    const status = err instanceof ClientError ? 400 : 500
+    const message = (err instanceof ClientError || err instanceof Error) ? err.message : 'Ingestion failed'
+    return getErrorResponse(status, message)
   }
 }
 

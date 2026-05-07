@@ -26,6 +26,13 @@ interface CheckUrlExistsResult {
   record?: DbRecord
 }
 
+/**
+ * @function ingestUrl        Ingest the contents of a user supplied URL.
+ *
+ * @param  {string} url       The URL being ingested.
+ * @param  {string} userType  The URL being ingested.
+ * @return {object}
+ */
 export const ingestUrl = async (url: string, userType: UserType) => {
   if (!url) throw new ClientError('URL is required')
 

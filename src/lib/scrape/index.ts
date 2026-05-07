@@ -3,7 +3,13 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 
-export async function scrapeUrl(url: string): Promise<string> {
+/**
+ * @function scrapeUrl  Upsert vectors into Pinecone.
+ *
+ * @param  {string} url The data being scraped.
+ * @return {string}     The scraped content. 
+ */
+export const scrapeUrl = async (url: string): Promise<string> => {
   const { data: html } = await axios.get(url)
   const $ = cheerio.load(html)
 
