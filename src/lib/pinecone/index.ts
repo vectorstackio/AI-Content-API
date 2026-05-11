@@ -60,7 +60,7 @@ export const queryVectors = async (params: {
     embedding,
     userType,
     topK = 10,
-    minScore = 0.75,
+    minScore = 0.3,
   } = params
 
   const searchRes = await index.query({
