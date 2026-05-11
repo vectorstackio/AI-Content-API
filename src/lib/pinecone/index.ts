@@ -52,7 +52,7 @@ export const upsertVectors = async (params: {
  */
 export const queryVectors = async (params: {
   embedding: number[]
-  userType: UserType
+  userType?: UserType
   topK?: number
   minScore?: number
 }) => {
@@ -70,11 +70,13 @@ export const queryVectors = async (params: {
 
     includeMetadata: true,
 
-    filter: {
-      userType: {
-        $eq: userType,
+    ...(userType && {
+      filter: {
+        userType: {
+          $eq: userType,
+        },
       },
-    },
+    }),
   })
 
   return (
@@ -86,6 +88,42 @@ export const queryVectors = async (params: {
     }) ?? []
   )
 }
+// export const queryVectors = async (params: {
+//   embedding: number[]
+//   userType: UserType
+//   topK?: number
+//   minScore?: number
+// }) => {
+//   const {
+//     embedding,
+//     userType,
+//     topK = 10,
+//     minScore = 0.75,
+//   } = params
+
+//   const searchRes = await index.query({
+//     vector: embedding,
+
+//     topK,
+
+//     includeMetadata: true,
+
+//     filter: {
+//       userType: {
+//         $eq: userType,
+//       },
+//     },
+//   })
+
+//   return (
+//     searchRes.matches?.filter((match) => {
+//       return (
+//         (match.score ?? 0) >= minScore &&
+//         typeof match.metadata?.chunk === 'string'
+//       )
+//     }) ?? []
+//   )
+// }
 
 /**
  * @function deleteVectors  Delete some vectors in Pinecone.
