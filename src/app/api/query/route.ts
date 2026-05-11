@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 
 import { querySchema } from '@/lib/query/validators'
-import { queryRag } from '@/lib/query'
+import { queryRagStream } from '@/lib/query'
 //import { deleteAll } from '@/lib/pinecone'
 
 const headers = {
@@ -21,20 +21,38 @@ export async function POST(req: NextRequest) {
     // Validate request
     const validated = querySchema.parse(body)
 
-    // Run RAG pipeline
-    const result = await queryRag(validated)
+    const encoder = new TextEncoder()
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // STREAMING RAG PIPELINE
+          const ragStream = await queryRagStream(validated)
+
+          for await (const chunk of ragStream) {
+            // chunk should be a string (token or partial text)
+            controller.enqueue(encoder.encode(chunk))
+          }
+
+          controller.close()
+        } catch (err) {
+          controller.error(err)
+        }
+      },
+    })
 
     // Uncommenting this will delete all data from the Pinecone index
-    //await deleteAll()
+    // await deleteAll()
 
-    return NextResponse.json(
-      result,
-      {
-        headers
-      }
-    )
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        ...headers,
+      },
+    })
+
   } catch (err: unknown) {
-    //console.error('Query API error:', err)
 
     if (err instanceof ZodError) {
       return NextResponse.json(
@@ -64,6 +82,57 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// export async function POST(req: NextRequest) {
+//   try {
+//     const body = await req.json()
+
+//     // Validate request
+//     const validated = querySchema.parse(body)
+
+//     // Run RAG pipeline
+//     const result = await queryRag(validated)
+
+//     // Uncommenting this will delete all data from the Pinecone index
+//     //await deleteAll()
+
+//     return NextResponse.json(
+//       result,
+//       {
+//         headers
+//       }
+//     )
+//   } catch (err: unknown) {
+//     //console.error('Query API error:', err)
+
+//     if (err instanceof ZodError) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           error: err.issues[0]?.message ?? 'Invalid request',
+//         },
+//         {
+//           status: 400,
+//           headers
+//         }
+//       )
+//     }
+
+//     return NextResponse.json(
+//       {
+//         success: false,
+//         error:
+//           err instanceof Error
+//             ? err.message
+//             : 'Internal server error',
+//       },
+//       {
+//         status: 500,
+//         headers
+//       }
+//     )
+//   }
+// }
 
 // import OpenAI from 'openai'
 // import { Pinecone } from '@pinecone-database/pinecone'
