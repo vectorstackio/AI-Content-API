@@ -7,6 +7,7 @@ const fields = {
   userId: { type: String, required: true },
   role: { type: String, enum: ['user', 'assistant'], required: true },
   content: { type: String, required: true },
+  queryId: { type: String, required: true },
 }
 
 const HubAiMessagesSchema = new Schema(

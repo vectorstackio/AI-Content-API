@@ -9,6 +9,7 @@ interface Message {
   userId: string
   role: string
   content: string
+  queryId: string
 }
 
 /**
