@@ -3,8 +3,8 @@
 import OpenAI from 'openai'
 import { ScoredPineconeRecord } from '@pinecone-database/pinecone'
 
-import config from '@/lib/config'
-import * as constants from '@/lib/constants'
+import config from '@/lib/common/config'
+import * as constants from '@/lib/common/constants'
 
 import { queryVectors, UserType, ChunkMetadata } from '@/lib/pinecone'
 

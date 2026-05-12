@@ -3,8 +3,8 @@
 import OpenAI from 'openai'
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses'
 
-import config from '@/lib/config'
-import * as constants from '@/lib/constants'
+import config from '@/lib/common/config'
+import * as constants from '@/lib/common/constants'
 
 import { retrieveContext } from './retrieve'
 import { buildPrompt } from './prompt'

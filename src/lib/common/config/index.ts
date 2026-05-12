@@ -1,4 +1,4 @@
-// lib/config/index.ts
+// lib/common/config/index.ts
 
 import * as dotenv from 'dotenv'
 

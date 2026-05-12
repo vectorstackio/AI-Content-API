@@ -2,7 +2,7 @@
 
 import mongoose from 'mongoose'
 
-import config from '@/lib/config'
+import config from '@/lib/common/config'
 
 /**
  * @function dbConnect  Connect to mongoDB using Mongoose.

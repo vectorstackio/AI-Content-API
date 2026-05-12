@@ -1,4 +1,4 @@
-// lib/constants/index.js
+// lib/common/constants/index.js
 
 export const EMBEDDING_MODEL = 'text-embedding-3-small'
 export const EMBEDDING_DIMENSION = 1536

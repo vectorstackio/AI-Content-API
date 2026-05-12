@@ -2,7 +2,7 @@
 
 import { Pinecone, RecordMetadata } from '@pinecone-database/pinecone'
 
-import config from '@/lib/config'
+import config from '@/lib/common/config'
 
 export type UserType =
   | 'pupil'

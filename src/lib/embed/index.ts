@@ -2,7 +2,7 @@
 
 import OpenAI from 'openai'
 
-import * as constants from '@/lib/constants'
+import * as constants from '@/lib/common/constants'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 

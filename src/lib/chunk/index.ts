@@ -1,6 +1,6 @@
 // lib/chunk/index.ts
 
-import * as constants from '@/lib/constants'
+import * as constants from '@/lib/common/constants'
 
 /**
  * @function chunkText      Split text into chunks ready to insert into Pinecone.
