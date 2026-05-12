@@ -1,4 +1,4 @@
-// lib/error/index.ts
+// lib/common/error/index.ts
 
 /**
  * Class to provide custom error type.

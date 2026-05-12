@@ -8,7 +8,7 @@ import { chunkText } from '@/lib/chunk'
 import { embedChunks } from '@/lib/embed'
 import { upsertVectors, deleteVectors } from '@/lib/pinecone'
 import { dbConnect } from '@/lib/common/db'
-import { ClientError } from '@/lib/error'
+import { ClientError } from '@/lib/common/error'
 import HubAiUrl from '@/lib/common/db/models/hubAiUrl.model'
 
 type UserType = 'pupil' | 'teacher' | 'tutor'

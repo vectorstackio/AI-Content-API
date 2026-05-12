@@ -1,7 +1,7 @@
 // app/api/ingest/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ClientError } from '@/lib/error'
+import { ClientError } from '@/lib/common/error'
 
 import { ingestUrl } from '@/lib/ingest'
 
