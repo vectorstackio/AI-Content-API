@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
 
           // 🟢 save assistant message AFTER stream ends
           await safeCreateMessage({
-            userId: ip,
+            userId: userId ?? ip,
             role: 'assistant',
             content: fullAnswer,
           })
