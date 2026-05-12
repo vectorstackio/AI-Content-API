@@ -6,7 +6,7 @@ import { ZodError } from 'zod'
 import { querySchema } from '@/lib/query/validators'
 import { queryRagStream } from '@/lib/query'
 import { rateLimit } from '@/lib/common/rateLimit'
-//import { deleteAll } from '@/lib/pinecone'
+//import { deleteAll } from '@/lib/common/pinecone'
 
 const headers = {
   'Access-Control-Allow-Origin': '*',

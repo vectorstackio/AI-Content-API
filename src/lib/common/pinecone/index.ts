@@ -1,4 +1,4 @@
-// lib/pinecone/index.ts
+// lib/common/pinecone/index.ts
 
 import { Pinecone, RecordMetadata } from '@pinecone-database/pinecone'
 

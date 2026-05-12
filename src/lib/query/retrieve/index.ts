@@ -6,7 +6,7 @@ import { ScoredPineconeRecord } from '@pinecone-database/pinecone'
 import config from '@/lib/common/config'
 import * as constants from '@/lib/common/constants'
 
-import { queryVectors, UserType, ChunkMetadata } from '@/lib/pinecone'
+import { queryVectors, UserType, ChunkMetadata } from '@/lib/common/pinecone'
 
 const openai = new OpenAI({
   apiKey: config.app.openAiKey,
