@@ -1,4 +1,4 @@
-// app/api/[userId]/route.ts
+// app/api/query/[userId]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getConversationHistory } from '@/lib/common/db'
