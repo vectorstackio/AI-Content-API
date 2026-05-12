@@ -15,6 +15,7 @@ const openai = new OpenAI({
 type RetrieveContextParams = {
   question: string
   userType: UserType
+  userId?: string
 }
 
 export type RetrievedChunk = {

@@ -16,6 +16,7 @@ const openai = new OpenAI({
 type QueryRagParams = {
   question: string
   userType: 'pupil' | 'teacher' | 'tutor'
+  userId?: string
 }
 
 export type QuerySuccessResponse = {

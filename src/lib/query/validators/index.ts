@@ -10,6 +10,11 @@ export const querySchema = z.object({
     .max(2000, 'Question too long'),
 
   userType: z.enum(['pupil', 'teacher', 'tutor']),
+
+  userId: z
+    .string()
+    .trim()
+    .optional(),
 })
 
 export type QueryInput = z.infer<typeof querySchema>

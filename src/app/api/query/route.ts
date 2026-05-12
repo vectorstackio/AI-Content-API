@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const validated = querySchema.parse(body)
+    const { userId } = validated
 
     const ip =
       req.headers.get('x-forwarded-for') ?? 'anonymous'
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // 🟢 save user message
     await safeCreateMessage({
-      userId: ip,
+      userId: userId ?? ip,
       role: 'user',
       content: validated.question,
     })
