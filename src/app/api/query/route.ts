@@ -5,6 +5,7 @@ import { ZodError } from 'zod'
 
 import { querySchema } from '@/lib/query/validators'
 import { queryRagStream } from '@/lib/query'
+import { rateLimit } from '@/lib/common/rateLimit'
 //import { deleteAll } from '@/lib/pinecone'
 
 const headers = {
@@ -20,6 +21,30 @@ export async function POST(req: NextRequest) {
 
     // Validate request
     const validated = querySchema.parse(body)
+
+    // 👇 identify user (simple IP-based)
+    const ip =
+      req.headers.get('x-forwarded-for') ??
+      'anonymous'
+
+    // 👇 rate limit config
+    const { success, remaining } = await rateLimit({
+      key: ip,
+      limit: 10,        // 10 requests
+      windowSec: 60,    // per minute
+    })
+
+    if (!success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many requests. Please wait a moment.',
+        },
+        {
+          status: 429,
+        }
+      )
+    }
 
     const encoder = new TextEncoder()
 
@@ -48,6 +73,7 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
+        'X-RateLimit-Remaining': String(remaining),
         ...headers,
       },
     })
