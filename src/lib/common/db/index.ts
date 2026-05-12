@@ -57,7 +57,7 @@ export async function safeCreateMessage(data: Message): Promise<{
 export async function getConversationHistory(userId: string, limit: number = 20): Promise<Message[]> {
   const messages = await HubAiMessages.find({
     userId,
-  }).sort({ createdAt: -1 }).limit(limit)
+  }).sort({ createdAt: 1 }).limit(limit)
 
   return messages
 }
