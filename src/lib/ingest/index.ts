@@ -5,7 +5,7 @@ import { Document } from 'mongoose'
 
 import { scrapeUrl } from '@/lib/scrape'
 import { chunkText } from '@/lib/chunk'
-import { embedChunks } from '@/lib/embed'
+import { embedChunks } from '@/lib/ingest/embed'
 import { upsertVectors, deleteVectors } from '@/lib/common/pinecone'
 import { dbConnect } from '@/lib/common/db'
 import { ClientError } from '@/lib/common/error'

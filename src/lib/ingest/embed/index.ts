@@ -1,4 +1,4 @@
-// lib/embed/index.ts
+// lib/ingest/embed/index.ts
 
 import OpenAI from 'openai'
 
