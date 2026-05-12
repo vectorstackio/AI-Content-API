@@ -1,4 +1,4 @@
-// src/lib/db/models/hubAiUrl.model.js
+// src/lib/common/db/models/hubAiUrl.model.js
 
 import mongoose from 'mongoose'
 

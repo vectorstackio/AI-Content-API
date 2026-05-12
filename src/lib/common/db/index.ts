@@ -1,4 +1,4 @@
-// lib/db/index.ts
+// lib/common/db/index.ts
 
 import mongoose from 'mongoose'
 
