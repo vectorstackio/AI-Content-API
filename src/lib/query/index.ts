@@ -42,56 +42,115 @@ export async function queryRagStream({
   question,
   userType,
 }: QueryRagParams) {
-  // 1. Retrieve context (same as before)
   const chunks = await retrieveContext({
     question,
     userType,
   })
 
-  // 2. Handle empty context
   if (!chunks.length) {
     async function* emptyStream() {
       yield 'I don\'t know'
     }
-    return emptyStream()
+
+    return {
+      stream: emptyStream(),
+      getFinal: async () => ({
+        answer: 'I don\'t know',
+        sources: [],
+      }),
+    }
   }
 
-  // 3. Build prompt (unchanged)
   const prompt = buildPrompt({
     question,
-    contextChunks: chunks.map((chunk) => chunk.text),
+    contextChunks: chunks.map((c) => c.text),
   })
 
-  // 4. Call OpenAI with STREAMING enabled
-  const response: AsyncIterable<ResponseStreamEvent> = await openai.responses.create({
-    model: constants.CHAT_MODEL,
-    input: prompt,
-    stream: true,
-  })
+  const response: AsyncIterable<ResponseStreamEvent> =
+    await openai.responses.create({
+      model: constants.CHAT_MODEL,
+      input: prompt,
+      stream: true,
+    })
 
-  // 5. Convert OpenAI stream → async generator
+  let fullAnswer = ''
+
   async function* stream() {
     for await (const event of response) {
       if (event.type === 'response.output_text.delta') {
+        fullAnswer += event.delta
         yield event.delta
       }
     }
   }
 
-  // 5. Convert OpenAI stream → async generator
-  // async function* stream() {
-  //   for await (const event of response) {
-  //     // OpenAI streams partial text deltas here
-  //     const token = (event as any).delta || (event as any).output_text
-
-  //     if (typeof token === 'string' && token.length > 0) {
-  //       yield token
-  //     }
-  //   }
-  // }
-
-  return stream()
+  return {
+    stream: stream(),
+    getFinal: async () => ({
+      answer: fullAnswer.trim(),
+      sources: chunks.map((c) => ({
+        text: c.text,
+        score: c.score,
+        source: c.source,
+      })),
+    }),
+  }
 }
+
+// export async function queryRagStream({
+//   question,
+//   userType,
+// }: QueryRagParams) {
+//   // 1. Retrieve context (same as before)
+//   const chunks = await retrieveContext({
+//     question,
+//     userType,
+//   })
+
+//   // 2. Handle empty context
+//   if (!chunks.length) {
+//     async function* emptyStream() {
+//       yield 'I don\'t know'
+//     }
+//     return emptyStream()
+//   }
+
+//   // 3. Build prompt (unchanged)
+//   const prompt = buildPrompt({
+//     question,
+//     contextChunks: chunks.map((chunk) => chunk.text),
+//   })
+
+//   // 4. Call OpenAI with STREAMING enabled
+//   const response: AsyncIterable<ResponseStreamEvent> = await openai.responses.create({
+//     model: constants.CHAT_MODEL,
+//     input: prompt,
+//     stream: true,
+//   })
+
+//   // 5. Convert OpenAI stream → async generator
+//   async function* stream() {
+//     for await (const event of response) {
+//       if (event.type === 'response.output_text.delta') {
+//         yield event.delta
+//       }
+//     }
+//   }
+
+//   // 5. Convert OpenAI stream → async generator
+//   // async function* stream() {
+//   //   for await (const event of response) {
+//   //     // OpenAI streams partial text deltas here
+//   //     const token = (event as any).delta || (event as any).output_text
+
+//   //     if (typeof token === 'string' && token.length > 0) {
+//   //       yield token
+//   //     }
+//   //   }
+//   // }
+
+//   return stream()
+// }
 
 export async function queryRag({
   question,

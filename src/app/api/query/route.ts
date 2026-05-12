@@ -6,6 +6,7 @@ import { ZodError } from 'zod'
 import { querySchema } from '@/lib/query/validators'
 import { queryRagStream } from '@/lib/query'
 import { rateLimit } from '@/lib/common/rateLimit'
+import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
 //import { deleteAll } from '@/lib/common/pinecone'
 
 const headers = {
@@ -18,20 +19,15 @@ const headers = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-
-    // Validate request
     const validated = querySchema.parse(body)
 
-    // 👇 identify user (simple IP-based)
     const ip =
-      req.headers.get('x-forwarded-for') ??
-      'anonymous'
+      req.headers.get('x-forwarded-for') ?? 'anonymous'
 
-    // 👇 rate limit config
     const { success, remaining } = await rateLimit({
       key: ip,
-      limit: 10,        // 10 requests
-      windowSec: 60,    // per minute
+      limit: 10,
+      windowSec: 60,
     })
 
     if (!success) {
@@ -40,36 +36,76 @@ export async function POST(req: NextRequest) {
           success: false,
           error: 'Too many requests. Please wait a moment.',
         },
-        {
-          status: 429,
-        }
+        { status: 429 }
       )
     }
 
     const encoder = new TextEncoder()
 
-    const stream = new ReadableStream({
+    const { stream, getFinal } = await queryRagStream(validated)
+
+    //const conversationId = crypto.randomUUID()
+
+    // 🟢 1. Save USER message immediately
+    await HubAiMessages.create({
+      userId: ip,
+      role: 'user',
+      content: validated.question,
+      createdAt: new Date(),
+    })
+
+    const streamResponse = new ReadableStream({
       async start(controller) {
         try {
-          // STREAMING RAG PIPELINE
-          const ragStream = await queryRagStream(validated)
-
-          for await (const chunk of ragStream) {
-            // chunk should be a string (token or partial text)
+          for await (const chunk of stream) {
             controller.enqueue(encoder.encode(chunk))
           }
 
           controller.close()
+
+          const final = await getFinal()
+
+          await HubAiMessages.create({
+            userId: ip,
+            role: 'assistant',
+            content: final.answer,
+          })
+
         } catch (err) {
           controller.error(err)
         }
       },
     })
 
-    // Uncommenting this will delete all data from the Pinecone index
-    // await deleteAll()
+    // let controllerRef: ReadableStreamDefaultController | null = null
 
-    return new Response(stream, {
+    // const streamResponse = new ReadableStream({
+    //   async start(controller) {
+    //     controllerRef = controller
+
+    //     try {
+    //       for await (const chunk of stream) {
+    //         controller.enqueue(encoder.encode(chunk))
+    //       }
+
+    //       controller.close()
+
+    //       // 🟢 2. AFTER streaming finishes → save assistant message
+    //       const final = await getFinal()
+
+    //       await HubAiMessages.create({
+    //         userId: ip,
+    //         role: 'assistant',
+    //         content: final.answer,
+    //       })
+
+    //     } catch (err) {
+    //       controller.error(err)
+    //     }
+    //   },
+    // })
+
+    return new Response(streamResponse, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
@@ -79,35 +115,119 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (err: unknown) {
-
     if (err instanceof ZodError) {
       return NextResponse.json(
         {
           success: false,
           error: err.issues[0]?.message ?? 'Invalid request',
         },
-        {
-          status: 400,
-          headers
-        }
+        { status: 400, headers }
       )
     }
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Internal server error',
+        error: err instanceof Error ? err.message : 'Internal server error',
       },
-      {
-        status: 500,
-        headers
-      }
+      { status: 500, headers }
     )
   }
 }
+
+// export async function POST(req: NextRequest) {
+//   try {
+//     const body = await req.json()
+
+//     // Validate request
+//     const validated = querySchema.parse(body)
+
+//     // 👇 identify user (simple IP-based)
+//     const ip =
+//       req.headers.get('x-forwarded-for') ??
+//       'anonymous'
+
+//     // 👇 rate limit config
+//     const { success, remaining } = await rateLimit({
+//       key: ip,
+//       limit: 10,        // 10 requests
+//       windowSec: 60,    // per minute
+//     })
+
+//     if (!success) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           error: 'Too many requests. Please wait a moment.',
+//         },
+//         {
+//           status: 429,
+//         }
+//       )
+//     }
+
+//     const encoder = new TextEncoder()
+
+//     const stream = new ReadableStream({
+//       async start(controller) {
+//         try {
+//           // STREAMING RAG PIPELINE
+//           const ragStream = await queryRagStream(validated)
+
+//           for await (const chunk of ragStream) {
+//             // chunk should be a string (token or partial text)
+//             controller.enqueue(encoder.encode(chunk))
+//           }
+
+//           controller.close()
+//         } catch (err) {
+//           controller.error(err)
+//         }
+//       },
+//     })
+
+//     // Uncommenting this will delete all data from the Pinecone index
+//     // await deleteAll()
+
+//     return new Response(stream, {
+//       headers: {
+//         'Content-Type': 'text/plain; charset=utf-8',
+//         'Cache-Control': 'no-cache',
+//         'X-RateLimit-Remaining': String(remaining),
+//         ...headers,
+//       },
+//     })
+
+//   } catch (err: unknown) {
+
+//     if (err instanceof ZodError) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           error: err.issues[0]?.message ?? 'Invalid request',
+//         },
+//         {
+//           status: 400,
+//           headers
+//         }
+//       )
+//     }
+
+//     return NextResponse.json(
+//       {
+//         success: false,
+//         error:
+//           err instanceof Error
+//             ? err.message
+//             : 'Internal server error',
+//       },
+//       {
+//         status: 500,
+//         headers
+//       }
+//     )
+//   }
+// }
 
 export async function OPTIONS() {
   return new Response(null, {
