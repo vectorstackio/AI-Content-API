@@ -1,4 +1,4 @@
-// lib/scrape/index.js
+// lib/ingest/scrape/index.ts
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'

@@ -1,4 +1,4 @@
-// lib/chunk/index.ts
+// lib/ingest/chunk/index.ts
 
 import * as constants from '@/lib/common/constants'
 
