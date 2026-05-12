@@ -1,7 +1,7 @@
 // app/api/query/[userId]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getConversationHistory } from '@/lib/common/db'
+import { getConversationHistory, dbConnect } from '@/lib/common/db'
 
 const headers = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +12,7 @@ const headers = {
 
 export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
   try {
+    await dbConnect()
     const { userId } = params
     const messages = await getConversationHistory(userId)
 
