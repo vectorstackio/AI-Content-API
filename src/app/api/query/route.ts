@@ -6,8 +6,7 @@ import { ZodError } from 'zod'
 import { querySchema } from '@/lib/query/validators'
 import { queryRagStream } from '@/lib/query'
 import { rateLimit } from '@/lib/common/rateLimit'
-import { dbConnect } from '@/lib/common/db'
-import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
+import { dbConnect, safeCreateMessage } from '@/lib/common/db'
 //import { deleteAll } from '@/lib/common/pinecone'
 
 const headers = {
@@ -45,68 +44,48 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder()
 
-    const { stream, getFinal } = await queryRagStream(validated)
+    const { stream } = await queryRagStream(validated)
 
-    //const conversationId = crypto.randomUUID()
-
-    // 🟢 1. Save USER message immediately
-    await HubAiMessages.create({
+    // 🟢 save user message
+    await safeCreateMessage({
       userId: ip,
       role: 'user',
       content: validated.question,
-      createdAt: new Date(),
     })
+
+    let fullAnswer = ''
 
     const streamResponse = new ReadableStream({
       async start(controller) {
         try {
           for await (const chunk of stream) {
+            fullAnswer += chunk
             controller.enqueue(encoder.encode(chunk))
           }
 
           controller.close()
 
-          const final = await getFinal()
-
-          await HubAiMessages.create({
+          // 🟢 save assistant message AFTER stream ends
+          await safeCreateMessage({
             userId: ip,
             role: 'assistant',
-            content: final.answer,
+            content: fullAnswer,
           })
 
         } catch (err) {
           controller.error(err)
+
+          // optional: still persist partial answer
+          if (fullAnswer) {
+            await safeCreateMessage({
+              userId: ip,
+              role: 'assistant',
+              content: fullAnswer,
+            })
+          }
         }
       },
     })
-
-    // let controllerRef: ReadableStreamDefaultController | null = null
-
-    // const streamResponse = new ReadableStream({
-    //   async start(controller) {
-    //     controllerRef = controller
-
-    //     try {
-    //       for await (const chunk of stream) {
-    //         controller.enqueue(encoder.encode(chunk))
-    //       }
-
-    //       controller.close()
-
-    //       // 🟢 2. AFTER streaming finishes → save assistant message
-    //       const final = await getFinal()
-
-    //       await HubAiMessages.create({
-    //         userId: ip,
-    //         role: 'assistant',
-    //         content: final.answer,
-    //       })
-
-    //     } catch (err) {
-    //       controller.error(err)
-    //     }
-    //   },
-    // })
 
     return new Response(streamResponse, {
       headers: {
