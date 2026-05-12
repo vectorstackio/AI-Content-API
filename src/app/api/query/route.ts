@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
           // optional: still persist partial answer
           if (fullAnswer) {
             await safeCreateMessage({
-              userId: ip,
+              userId: userId ?? ip,
               role: 'assistant',
               content: fullAnswer,
             })
