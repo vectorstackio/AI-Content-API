@@ -13,7 +13,7 @@ const headers = {
 export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
   try {
     await dbConnect()
-    const { userId } = params
+    const { userId } = await params
     const messages = await getConversationHistory(userId)
 
     return NextResponse.json({
