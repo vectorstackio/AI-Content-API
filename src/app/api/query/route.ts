@@ -6,6 +6,7 @@ import { ZodError } from 'zod'
 import { querySchema } from '@/lib/query/validators'
 import { queryRagStream } from '@/lib/query'
 import { rateLimit } from '@/lib/common/rateLimit'
+import { dbConnect } from '@/lib/common/db'
 import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
 //import { deleteAll } from '@/lib/common/pinecone'
 
@@ -18,6 +19,8 @@ const headers = {
 
 export async function POST(req: NextRequest) {
   try {
+    await dbConnect()
+
     const body = await req.json()
     const validated = querySchema.parse(body)
 
