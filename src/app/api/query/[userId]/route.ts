@@ -16,10 +16,13 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
     const { userId } = await params
     const messages = await getConversationHistory(userId)
 
-    return NextResponse.json({
-      success: true,
-      data: messages,
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        data: messages,
+      },
+      { headers }
+    )
   } catch (err: unknown) {
     return NextResponse.json(
       {
