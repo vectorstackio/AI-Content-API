@@ -1,11 +1,6 @@
 // lib/common/rateLimit/index.ts
 
-import Redis from 'ioredis'
-
-const redis = new Redis({
-  host: '127.0.0.1',
-  port: 6379,
-})
+import { redis } from '@/lib/common/redis'
 
 export async function rateLimit({
   key,

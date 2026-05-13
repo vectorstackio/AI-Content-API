@@ -5,6 +5,7 @@ import { ScoredPineconeRecord } from '@pinecone-database/pinecone'
 
 import config from '@/lib/common/config'
 import * as constants from '@/lib/common/constants'
+import { redis } from '@/lib/common/redis'
 
 import { queryVectors, UserType, ChunkMetadata } from '@/lib/common/pinecone'
 
@@ -28,19 +29,45 @@ export async function retrieveContext({
   question,
   userType,
 }: RetrieveContextParams): Promise<RetrievedChunk[]> {
-  const embeddingRes =
-    await openai.embeddings.create({
-      model: constants.EMBEDDING_MODEL,
-      input: question,
-    })
 
-  const embedding =
-    embeddingRes.data[0]?.embedding
+  const normalizedQuestion =
+    question.trim().toLowerCase()
 
-  if (!embedding) {
-    throw new Error('Failed to create embedding')
+  const cacheKey =
+    `embedding:${normalizedQuestion}`
+
+  let embedding: number[]
+
+  // 🟢 1. Check Redis cache
+  const cachedEmbedding = await redis.get(cacheKey)
+
+  if (cachedEmbedding) {
+    embedding = JSON.parse(cachedEmbedding)
+  } else {
+
+    // 🟢 2. Generate embedding
+    const embeddingRes =
+      await openai.embeddings.create({
+        model: constants.EMBEDDING_MODEL,
+        input: question,
+      })
+
+    embedding = embeddingRes.data[0]?.embedding ?? []
+
+    if (!embedding.length) {
+      throw new Error('Failed to create embedding')
+    }
+
+    // 🟢 3. Cache embedding
+    await redis.set(
+      cacheKey,
+      JSON.stringify(embedding),
+      'EX',
+      60 * 60 * 24 * 7 // 7 days
+    )
   }
 
+  // 🟢 4. Query Pinecone
   const matches = await queryVectors({
     embedding,
     userType,
@@ -53,21 +80,38 @@ export async function retrieveContext({
       score: match.score ?? 0,
       source: match.metadata.source,
     }))
-
-  // return matches
-  //   .filter((match) => match.metadata?.chunk)
-  //   .map((match) => ({
-  //     text: match.metadata.chunk,
-  //     score: match.score ?? 0,
-  //     source: match.metadata?.source,
-  //   }))
-
-  // return matches.map((match) => ({
-  //   text: match.metadata.chunk,
-  //   score: match.score ?? 0,
-  //   source: match.metadata.source,
-  // }))
 }
+
+// export async function retrieveContext({
+//   question,
+//   userType,
+// }: RetrieveContextParams): Promise<RetrievedChunk[]> {
+//   const embeddingRes =
+//     await openai.embeddings.create({
+//       model: constants.EMBEDDING_MODEL,
+//       input: question,
+//     })
+
+//   const embedding =
+//     embeddingRes.data[0]?.embedding
+
+//   if (!embedding) {
+//     throw new Error('Failed to create embedding')
+//   }
+
+//   const matches = await queryVectors({
+//     embedding,
+//     userType,
+//   })
+
+//   return matches
+//     .filter(hasValidMetadata)
+//     .map((match) => ({
+//       text: match.metadata.chunk,
+//       score: match.score ?? 0,
+//       source: match.metadata.source,
+//     }))
+// }
 
 const hasValidMetadata = (
   match: ScoredPineconeRecord<ChunkMetadata>
