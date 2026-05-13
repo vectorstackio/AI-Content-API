@@ -30,11 +30,9 @@ export async function retrieveContext({
   userType,
 }: RetrieveContextParams): Promise<RetrievedChunk[]> {
 
-  const normalizedQuestion =
-    question.trim().toLowerCase()
+  const normalizedQuestion = question.trim().toLowerCase()
 
-  const cacheKey =
-    `embedding:${normalizedQuestion}`
+  const cacheKey = `embedding:${constants.EMBEDDING_MODEL}:${normalizedQuestion}`
 
   let embedding: number[]
 
