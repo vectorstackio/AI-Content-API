@@ -32,18 +32,30 @@ export async function retrieveContext({
 
   const normalizedQuestion = question.trim().toLowerCase()
 
-  const cacheKey = `embedding:${constants.EMBEDDING_MODEL}:${normalizedQuestion}`
+  // 🟢 VERSIONED CACHE KEY
+  const retrievalCacheKey = `retrieval:v1:${userType}:${normalizedQuestion}`
+
+  // 🟢 1. CHECK RETRIEVAL CACHE
+  const cachedRetrieval = await redis.get(retrievalCacheKey)
+
+  if (cachedRetrieval) {
+    return JSON.parse(cachedRetrieval)
+  }
+
+  // -----------------------------
+  // EMBEDDING CACHE
+  // -----------------------------
+
+  const embeddingCacheKey = `embedding:${constants.EMBEDDING_MODEL}:${normalizedQuestion}`
 
   let embedding: number[]
 
-  // 🟢 1. Check Redis cache
-  const cachedEmbedding = await redis.get(cacheKey)
+  const cachedEmbedding = await redis.get(embeddingCacheKey)
 
   if (cachedEmbedding) {
     embedding = JSON.parse(cachedEmbedding)
   } else {
 
-    // 🟢 2. Generate embedding
     const embeddingRes =
       await openai.embeddings.create({
         model: constants.EMBEDDING_MODEL,
@@ -53,32 +65,101 @@ export async function retrieveContext({
     embedding = embeddingRes.data[0]?.embedding ?? []
 
     if (!embedding.length) {
-      throw new Error('Failed to create embedding')
+      throw new Error(
+        'Failed to create embedding'
+      )
     }
 
-    // 🟢 3. Cache embedding
     await redis.set(
-      cacheKey,
+      embeddingCacheKey,
       JSON.stringify(embedding),
       'EX',
-      60 * 60 * 24 * 7 // 7 days
+      60 * 60 * 24 * 7
     )
   }
 
-  // 🟢 4. Query Pinecone
+  // -----------------------------
+  // PINECONE QUERY
+  // -----------------------------
+
   const matches = await queryVectors({
     embedding,
     userType,
   })
 
-  return matches
+  const results = matches
     .filter(hasValidMetadata)
     .map((match) => ({
       text: match.metadata.chunk,
       score: match.score ?? 0,
       source: match.metadata.source,
     }))
+
+  // 🟢 CACHE RETRIEVAL RESULTS
+  await redis.set(
+    retrievalCacheKey,
+    JSON.stringify(results),
+    'EX',
+    60 * 60 // 1 hour
+  )
+
+  return results
 }
+
+// export async function retrieveContext({
+//   question,
+//   userType,
+// }: RetrieveContextParams): Promise<RetrievedChunk[]> {
+
+//   const normalizedQuestion = question.trim().toLowerCase()
+
+//   const cacheKey = `embedding:${constants.EMBEDDING_MODEL}:${normalizedQuestion}`
+
+//   let embedding: number[]
+
+//   // 🟢 1. Check Redis cache
+//   const cachedEmbedding = await redis.get(cacheKey)
+
+//   if (cachedEmbedding) {
+//     embedding = JSON.parse(cachedEmbedding)
+//   } else {
+
+//     // 🟢 2. Generate embedding
+//     const embeddingRes =
+//       await openai.embeddings.create({
+//         model: constants.EMBEDDING_MODEL,
+//         input: question,
+//       })
+
+//     embedding = embeddingRes.data[0]?.embedding ?? []
+
+//     if (!embedding.length) {
+//       throw new Error('Failed to create embedding')
+//     }
+
+//     // 🟢 3. Cache embedding
+//     await redis.set(
+//       cacheKey,
+//       JSON.stringify(embedding),
+//       'EX',
+//       60 * 60 * 24 * 7 // 7 days
+//     )
+//   }
+
+//   // 🟢 4. Query Pinecone
+//   const matches = await queryVectors({
+//     embedding,
+//     userType,
+//   })
+
+//   return matches
+//     .filter(hasValidMetadata)
+//     .map((match) => ({
+//       text: match.metadata.chunk,
+//       score: match.score ?? 0,
+//       source: match.metadata.source,
+//     }))
+// }
 
 // export async function retrieveContext({
 //   question,
