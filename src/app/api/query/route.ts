@@ -15,6 +15,7 @@ const headers = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Expose-Headers': 'X-AI-Status', // 👈 REQUIRED
   'Access-Control-Max-Age': '86400',
 }
 
@@ -27,8 +28,7 @@ export async function POST(req: NextRequest) {
     const { userId } = validated
     const queryId = crypto.randomUUID()
 
-    const ip =
-      req.headers.get('x-forwarded-for') ?? 'anonymous'
+    const ip = req.headers.get('x-forwarded-for') ?? 'anonymous'
 
     const { success, remaining } = await rateLimit({
       key: ip,
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder()
 
-    const { stream } = await queryRagStream(validated)
+    const { stream, status } = await queryRagStream(validated)
 
     // 🟢 save user message
     await safeCreateMessage({
@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
         'X-RateLimit-Remaining': String(remaining),
+        'X-AI-Status': status,
         ...headers,
       },
     })
