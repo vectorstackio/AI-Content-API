@@ -43,11 +43,13 @@ export async function queryRagStream({
   question,
   userType,
 }: QueryRagParams) {
+
   const chunks = await retrieveContext({
     question,
     userType,
   })
 
+  // 🟡 NO CONTEXT → unknown status
   if (!chunks.length) {
     async function* emptyStream() {
       yield 'I don\'t know'
@@ -55,6 +57,7 @@ export async function queryRagStream({
 
     return {
       stream: emptyStream(),
+      status: 'unknown' as const,
       getFinal: async () => ({
         answer: 'I don\'t know',
         sources: [],
@@ -87,6 +90,7 @@ export async function queryRagStream({
 
   return {
     stream: stream(),
+    status: 'answered' as const,
     getFinal: async () => ({
       answer: fullAnswer.trim(),
       sources: chunks.map((c) => ({
@@ -97,6 +101,65 @@ export async function queryRagStream({
     }),
   }
 }
+
+// export async function queryRagStream({
+//   question,
+//   userType,
+// }: QueryRagParams) {
+//   const chunks = await retrieveContext({
+//     question,
+//     userType,
+//   })
+
+//   if (!chunks.length) {
+//     async function* emptyStream() {
+//       yield 'I don\'t know'
+//     }
+
+//     return {
+//       stream: emptyStream(),
+//       getFinal: async () => ({
+//         answer: 'I don\'t know',
+//         sources: [],
+//       }),
+//     }
+//   }
+
+//   const prompt = buildPrompt({
+//     question,
+//     contextChunks: chunks.map((c) => c.text),
+//   })
+
+//   const response: AsyncIterable<ResponseStreamEvent> =
+//     await openai.responses.create({
+//       model: constants.CHAT_MODEL,
+//       input: prompt,
+//       stream: true,
+//     })
+
+//   let fullAnswer = ''
+
+//   async function* stream() {
+//     for await (const event of response) {
+//       if (event.type === 'response.output_text.delta') {
+//         fullAnswer += event.delta
+//         yield event.delta
+//       }
+//     }
+//   }
+
+//   return {
+//     stream: stream(),
+//     getFinal: async () => ({
+//       answer: fullAnswer.trim(),
+//       sources: chunks.map((c) => ({
+//         text: c.text,
+//         score: c.score,
+//         source: c.source,
+//       })),
+//     }),
+//   }
+// }
 
 // export async function queryRagStream({
 //   question,
