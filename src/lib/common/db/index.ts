@@ -1,8 +1,5 @@
 // lib/common/db/index.ts
 
-import mongoose from 'mongoose'
-
-import config from '@/lib/common/config'
 import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
 
 interface Message {
@@ -10,19 +7,6 @@ interface Message {
   role: string
   content: string
   queryId: string
-}
-
-/**
- * @function dbConnect  Connect to mongoDB using Mongoose.
- *
- * @return {object}     A Mongoose instance.
- */
-export const dbConnect = async (): Promise<typeof mongoose> => {
-  if (!config.db.url) {
-    throw new Error('Please define the MONGODB_URI environment variable')
-  }
-  await mongoose.connect(config.db.url)
-  return mongoose
 }
 
 /**
@@ -61,3 +45,5 @@ export async function getConversationHistory(userId: string, limit: number = 20)
 
   return messages
 }
+
+export { dbConnect } from '@/lib/common/db/helpers'
