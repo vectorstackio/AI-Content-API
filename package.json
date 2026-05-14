@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3021",
     "lint": "eslint",
-    "codelint": "npm run lint src/ && tsc --noEmit"
+    "codelint": "npm run lint src/ && tsc --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@pinecone-database/pinecone": "^7.2.0",
@@ -33,6 +34,8 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.4",
     "eslint-plugin-react": "^7.37.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
