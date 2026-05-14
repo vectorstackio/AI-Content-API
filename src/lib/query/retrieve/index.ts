@@ -9,6 +9,8 @@ import { redis } from '@/lib/common/redis'
 
 import { queryVectors, UserType, ChunkMetadata } from '@/lib/common/pinecone'
 
+const MIN_SCORE = 0.4
+
 const openai = new OpenAI({
   apiKey: config.app.openAiKey,
 })
@@ -89,6 +91,7 @@ export async function retrieveContext({
 
   const results = matches
     .filter(hasValidMetadata)
+    .filter((match) => (match.score ?? 0) > MIN_SCORE)
     .map((match) => ({
       text: match.metadata.chunk,
       score: match.score ?? 0,
