@@ -10,10 +10,15 @@ const headers = {
   'Access-Control-Max-Age': '86400',
 }
 
-export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ userId: string }> }
+) {
   try {
     await dbConnect()
-    const { userId } = await params
+
+    const { userId } = await context.params
+
     const messages = await getConversationHistory(userId)
 
     return NextResponse.json(
