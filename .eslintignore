@@ -1,3 +1,4 @@
 node_modules
 scripts
 src/app/layout.js
+jest.config.js
