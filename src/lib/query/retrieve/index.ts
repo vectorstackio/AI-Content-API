@@ -7,7 +7,8 @@ import config from '@/lib/common/config'
 import * as constants from '@/lib/common/constants'
 import { redis } from '@/lib/common/redis'
 
-import { queryVectors, UserType, ChunkMetadata } from '@/lib/common/pinecone'
+import { queryVectors } from '@/lib/common/pinecone'
+import type { UserType, ChunkMetadata } from '@/types'
 
 const MIN_SCORE = 0.4
 
@@ -89,9 +90,23 @@ export async function retrieveContext({
     userType,
   })
 
+  // const results = matches
+  //   .filter(hasValidMetadata)
+  //   .filter((match) => (match.score ?? 0) > MIN_SCORE)
+  //   .map((match) => ({
+  //     text: match.metadata.chunk,
+  //     score: match.score ?? 0,
+  //     source: match.metadata.source,
+  //   }))
+
   const results = matches
-    .filter(hasValidMetadata)
-    .filter((match) => (match.score ?? 0) > MIN_SCORE)
+    .filter(
+      (match): match is ScoredPineconeRecord<ChunkMetadata> & {
+        metadata: ChunkMetadata
+      } =>
+        typeof match.metadata?.chunk === 'string' &&
+        (match.score ?? 0) > MIN_SCORE
+    )
     .map((match) => ({
       text: match.metadata.chunk,
       score: match.score ?? 0,
@@ -109,12 +124,12 @@ export async function retrieveContext({
   return results
 }
 
-const hasValidMetadata = (
-  match: ScoredPineconeRecord<ChunkMetadata>
-): match is ScoredPineconeRecord<ChunkMetadata> & {
-  metadata: ChunkMetadata
-} => {
-  return (
-    typeof match.metadata?.chunk === 'string'
-  )
-}
+// const hasValidMetadata = (
+//   match: ScoredPineconeRecord<ChunkMetadata>
+// ): match is ScoredPineconeRecord<ChunkMetadata> & {
+//   metadata: ChunkMetadata
+// } => {
+//   return (
+//     typeof match.metadata?.chunk === 'string'
+//   )
+// }

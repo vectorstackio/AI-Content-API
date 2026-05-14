@@ -1,30 +1,13 @@
 // lib/common/pinecone/index.ts
 
-import { Pinecone, RecordMetadata } from '@pinecone-database/pinecone'
+import { RecordMetadata, ScoredPineconeRecord } from '@pinecone-database/pinecone'
 
-import config from '@/lib/common/config'
-
-export type UserType =
-  | 'pupil'
-  | 'teacher'
-  | 'tutor'
-
-export type ChunkMetadata = {
-  chunk: string
-  userType: UserType
-  source?: string
-  url?: string
-}
+import { index } from '@/lib/common/pinecone/client'
+import type { ChunkMetadata, UserType } from '@/types'
 
 type DeleteByFilter = {
   filter: Partial<Record<keyof RecordMetadata, unknown>>
 }
-
-const pinecone = new Pinecone({
-  apiKey: config.app.pineconeApiKey,
-})
-
-const index = pinecone.index<ChunkMetadata>(config.app.pineconeIndexName)
 
 /**
  * @function upsertVectors  Upsert vectors into Pinecone.
@@ -55,7 +38,7 @@ export const queryVectors = async (params: {
   userType?: UserType
   topK?: number
   minScore?: number
-}) => {
+}): Promise<ScoredPineconeRecord<ChunkMetadata>[]> => {
   const {
     embedding,
     userType,
