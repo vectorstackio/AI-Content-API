@@ -14,7 +14,7 @@
   "dependencies": {
     "@pinecone-database/pinecone": "^7.2.0",
     "axios": "^1.16.0",
-    "cheerio": "^1.2.0",
+    "cheerio": "^1.0.0-rc.12",
     "crypto": "^1.0.1",
     "dotenv": "^17.4.2",
     "ioredis": "^5.10.1",
