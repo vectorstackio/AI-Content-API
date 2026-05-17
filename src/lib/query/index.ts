@@ -102,51 +102,51 @@ export async function queryRagStream({
   }
 }
 
-export async function queryRag({
-  question,
-  userType,
-}: QueryRagParams): Promise<QueryResponse> {
-  // Retrieve relevant chunks
-  const chunks = await retrieveContext({
-    question,
-    userType,
-  })
+// export async function queryRag({
+//   question,
+//   userType,
+// }: QueryRagParams): Promise<QueryResponse> {
+//   // Retrieve relevant chunks
+//   const chunks = await retrieveContext({
+//     question,
+//     userType,
+//   })
 
-  // No useful matches
-  if (!chunks.length) {
-    return {
-      success: true,
-      answer: 'I don\'t know',
-      sources: [],
-    }
-  }
+//   // No useful matches
+//   if (!chunks.length) {
+//     return {
+//       success: true,
+//       answer: 'I don\'t know',
+//       sources: [],
+//     }
+//   }
 
-  // Build prompt
-  const prompt = buildPrompt({
-    question,
-    contextChunks: chunks.map((chunk) => chunk.text),
-  })
+//   // Build prompt
+//   const prompt = buildPrompt({
+//     question,
+//     contextChunks: chunks.map((chunk) => chunk.text),
+//   })
 
-  // Call OpenAI
-  const completion = await openai.responses.create({
-    model: constants.CHAT_MODEL,
-    input: prompt,
-  })
+//   // Call OpenAI
+//   const completion = await openai.responses.create({
+//     model: constants.CHAT_MODEL,
+//     input: prompt,
+//   })
 
-  const answer = completion.output_text?.trim()
+//   const answer = completion.output_text?.trim()
 
-  if (!answer) {
-    throw new Error('No answer returned from OpenAI')
-  }
+//   if (!answer) {
+//     throw new Error('No answer returned from OpenAI')
+//   }
 
-  return {
-    success: true,
-    answer,
+//   return {
+//     success: true,
+//     answer,
 
-    sources: chunks.map((chunk) => ({
-      text: chunk.text,
-      score: chunk.score,
-      source: chunk.source,
-    })),
-  }
-}
+//     sources: chunks.map((chunk) => ({
+//       text: chunk.text,
+//       score: chunk.score,
+//       source: chunk.source,
+//     })),
+//   }
+// }
