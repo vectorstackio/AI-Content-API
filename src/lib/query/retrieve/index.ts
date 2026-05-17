@@ -68,9 +68,7 @@ export async function retrieveContext({
     embedding = embeddingRes.data[0]?.embedding ?? []
 
     if (!embedding.length) {
-      throw new Error(
-        'Failed to create embedding'
-      )
+      throw new Error('Failed to create embedding')
     }
 
     await redis.set(
