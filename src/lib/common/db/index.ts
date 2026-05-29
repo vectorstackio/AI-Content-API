@@ -1,7 +1,7 @@
 // lib/common/db/index.ts
 
 import config from '@/lib/common/config'
-import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
+//import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
 
 interface Message {
   userId: string
@@ -20,7 +20,13 @@ export async function safeCreateMessage(data: Message): Promise<{
   error?: string
 }> {
   try {
-    await HubAiMessages.create(data)
+    //await HubAiMessages.create(data)
+
+    await fetch(`${config.app.apiUrl}/api/v02/db/hubAiMessages?tspAuthToken=${config.app.apiAuthToken}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data }),
+    })
 
     return {
       success: true,
