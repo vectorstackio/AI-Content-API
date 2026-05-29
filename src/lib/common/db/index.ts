@@ -41,7 +41,7 @@ export async function safeCreateMessage(data: Message): Promise<{
  */
 export async function getConversationHistory(userId: string, limit: number = 20): Promise<Message[]> {
   const response = await fetch(
-    `${config.app.apiUrl}/api/v02/db/hubAiMessages?fields=userId&userId=${userId}&limit=${limit}&tspAuthToken=${config.app.apiAuthToken}`,
+    `${config.app.apiUrl}/api/v02/db/hubAiMessages?userId=${userId}&limit=${limit}&tspAuthToken=${config.app.apiAuthToken}`,
     {
       method: 'GET',
       headers: {
