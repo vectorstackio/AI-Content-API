@@ -18,6 +18,14 @@ jest.mock('@/lib/common/pinecone', () => ({
   queryVectors: jest.fn(),
 }))
 
+beforeEach(() => {
+  global.fetch = jest.fn()
+})
+
+afterEach(() => {
+  jest.restoreAllMocks()
+})
+
 const response = {
   data: [
     { embedding: [0.1, 0.2] },
