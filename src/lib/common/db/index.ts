@@ -1,5 +1,6 @@
 // lib/common/db/index.ts
 
+//import config from '@/lib/common/config'
 import HubAiMessages from '@/lib/common/db/models/hubAiMessage.model'
 
 interface Message {
@@ -39,6 +40,15 @@ export async function safeCreateMessage(data: Message): Promise<{
  * @param  {number} limit   The number of messages to retrieve.
  */
 export async function getConversationHistory(userId: string, limit: number = 20): Promise<Message[]> {
+  // const response = await fetch(
+  //   `${config.app.apiUrl}/api/v02/hubAiMessages?userId=${userId}&limit=${limit}&tspAuthToken=${config.app.apiAuthToken}`,
+  //   {
+  //     method: 'GET',
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //     }
+  //   }
+  // )
   const messages = await HubAiMessages.find({
     userId,
   }).sort({ createdAt: 1 }).limit(limit)
