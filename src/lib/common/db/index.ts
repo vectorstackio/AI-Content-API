@@ -25,7 +25,7 @@ export async function safeCreateMessage(data: Message): Promise<{
     await fetch(`${config.app.apiUrl}/api/v02/db/hubAiMessages?tspAuthToken=${config.app.apiAuthToken}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data }),
+      body: JSON.stringify(data),
     })
 
     return {
