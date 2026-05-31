@@ -9,6 +9,7 @@ import { embedChunks } from '@/lib/ingest/embed'
 import { upsertVectors, deleteVectors } from '@/lib/common/pinecone'
 import { dbConnect } from '@/lib/common/db'
 import { ClientError } from '@/lib/common/error'
+import config from '@/lib/common/config'
 import HubAiUrl from '@/lib/common/db/models/hubAiUrl.model'
 
 type UserType = 'pupil' | 'teacher' | 'tutor'
@@ -94,7 +95,21 @@ const createHash = (text: string) => {
 }
 
 const checkUrlExists = async (url: string, userType: UserType, contentHash: string): Promise<CheckUrlExistsResult> => {
-  const existing = await HubAiUrl.findOne({ url, userType }) as DbRecord | null
+  const response = await fetch(
+    `${config.app.apiUrl}/api/v02/db/hubAiUrls?url=${url}&userType=${userType}&tspAuthToken=${config.app.apiAuthToken}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    }
+  )
+  const data = await response.json()
+  const records = data.records ?? []
+  const existing = records.length ? records[0] : null
+
+  //const existing = await HubAiUrl.findOne({ url, userType }) as DbRecord | null
+
   if (existing) {
     if (existing.contentHash === contentHash) {
       return { exists: true, unchanged: true }
