@@ -10,7 +10,7 @@ import { upsertVectors, deleteVectors } from '@/lib/common/pinecone'
 import { dbConnect } from '@/lib/common/db'
 import { ClientError } from '@/lib/common/error'
 import config from '@/lib/common/config'
-import HubAiUrl from '@/lib/common/db/models/hubAiUrl.model'
+//import HubAiUrl from '@/lib/common/db/models/hubAiUrl.model'
 
 type UserType = 'pupil' | 'teacher' | 'tutor'
 
@@ -108,8 +108,6 @@ const checkUrlExists = async (url: string, userType: UserType, contentHash: stri
   const records = data.records ?? []
   const existing = records.length ? records[0] : null
 
-  //const existing = await HubAiUrl.findOne({ url, userType }) as DbRecord | null
-
   if (existing) {
     if (existing.contentHash === contentHash) {
       return { exists: true, unchanged: true }
@@ -122,17 +120,28 @@ const checkUrlExists = async (url: string, userType: UserType, contentHash: stri
 
 const updateDb = async (url: string, content: string, contentHash: string, userType: string, existing: DbRecord | null = null) => {
   if (existing) {
-    existing.content = content
-    existing.contentHash = contentHash
-    existing.userType = userType
-    await existing.save()
-    return existing
+    const { _id, ...rest } = existing
+    rest.content = content
+    rest.contentHash = contentHash
+    rest.userType = userType
+    await fetch(`${config.app.apiUrl}/api/v02/db/hubAiUrls/${_id}?tspAuthToken=${config.app.apiAuthToken}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rest),
+    })
+    return rest
   }
   return createRecord(url, content, contentHash, userType)
 }
 
 const createRecord = async (url: string, content: string, contentHash: string, userType: string) => {
-  const hubAiUrl = new HubAiUrl({ url, content, contentHash, userType })
-  await hubAiUrl.save()
-  return hubAiUrl
+  const data = { url, content, contentHash, userType }
+  await fetch(`${config.app.apiUrl}/api/v02/db/hubAiUrls?tspAuthToken=${config.app.apiAuthToken}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  //const hubAiUrl = new HubAiUrl({ url, content, contentHash, userType })
+  //await hubAiUrl.save()
+  return data
 }
