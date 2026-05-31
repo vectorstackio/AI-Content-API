@@ -7,10 +7,8 @@ import { scrapeUrl } from '@/lib/ingest/scrape'
 import { chunkText } from '@/lib/ingest/chunk'
 import { embedChunks } from '@/lib/ingest/embed'
 import { upsertVectors, deleteVectors } from '@/lib/common/pinecone'
-import { dbConnect } from '@/lib/common/db'
 import { ClientError } from '@/lib/common/error'
 import config from '@/lib/common/config'
-//import HubAiUrl from '@/lib/common/db/models/hubAiUrl.model'
 
 type UserType = 'pupil' | 'teacher' | 'tutor'
 
@@ -45,7 +43,6 @@ export const ingestUrl = async (url: string, userType: UserType) => {
   }
 
   // 2. Check for existing URL
-  await dbConnect()
   const normalized = text.replace(/\s+/g, ' ').trim()
   const contentHash = createHash(normalized)
   const result = await checkUrlExists(url, userType, contentHash)
@@ -141,7 +138,5 @@ const createRecord = async (url: string, content: string, contentHash: string, u
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   })
-  //const hubAiUrl = new HubAiUrl({ url, content, contentHash, userType })
-  //await hubAiUrl.save()
   return data
 }
