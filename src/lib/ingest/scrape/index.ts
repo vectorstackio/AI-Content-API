@@ -1,6 +1,6 @@
 // lib/ingest/scrape/index.ts
 
-import axios from 'axios'
+import { fetchHtml } from '@/lib/ingest/safeFetch'
 import * as cheerio from 'cheerio'
 
 /**
@@ -10,7 +10,7 @@ import * as cheerio from 'cheerio'
  * @return {string}     The scraped content. 
  */
 export const scrapeUrl = async (url: string): Promise<string> => {
-  const { data: html } = await axios.get(url)
+  const html = await fetchHtml(url)
   const $ = cheerio.load(html)
 
   const article = $('article, .article, .content').first()

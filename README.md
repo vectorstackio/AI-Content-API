@@ -71,3 +71,32 @@ Next tests should target ingestion orchestration and failure ordering; route
 validation, CORS and streaming lifecycle; safe URL fetching/redirects; database
 HTTP failures; and Redis concurrency/cache failures. Production behaviour was
 preserved during migration, including `chunkText('')` returning `['']`.
+
+## URL ingestion security
+
+`src/lib/ingest/safeFetch/` is the URL-fetching boundary used by the scraper.
+It permits HTTP(S) without credentials, requires all DNS answers to be public,
+and pins a fresh direct Node HTTP(S) connection to the first validated address.
+The original hostname is retained for Host, TLS SNI and certificate validation.
+No environment proxy, automatic redirects, retries or pooled sockets are used.
+IPv4 special-use ranges and Azure's platform virtual IP are blocked. IPv6 is
+restricted to global unicast with special-purpose/documentation/tunnel ranges
+excluded; mapped and translated IPv4 forms are rejected conservatively.
+
+Limits: 5 seconds to connect/TLS handshake, 5 seconds idle socket time, 15 seconds
+overall including DNS, and 2 MiB actual response bytes. Responses must be successful
+HTML or XHTML. Compressed responses are rejected (identity encoding is requested).
+Errors use the existing ClientError response shape without internal network details.
+
+Redirecting URLs must now be replaced with their final public URL. Sites requiring
+compression, non-UTF-8 decoding or more than 2 MiB are not supported by this boundary.
+There is no automatic fallback to another validated DNS address. HTTP remains
+unencrypted, and public network routing/egress controls remain deployment concerns.
+DNS cannot be cancelled by Node's lookup API, but late resolution cannot start a
+request after the deadline.
+
+The transport test opens only a loopback server, with a test-only address-policy
+exception for that fixture. Production-policy tests separately reject loopback.
+It verifies that the real Node HTTP/socket stack uses the validated snapshot and
+preserves Host; tests do not contact public websites. Restricted sandboxes may
+need permission to bind the loopback listening socket.

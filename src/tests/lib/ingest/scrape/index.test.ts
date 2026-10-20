@@ -1,16 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { Mocked } from 'vitest'
 
-import axios from 'axios'
+import { fetchHtml } from '@/lib/ingest/safeFetch'
 import { scrapeUrl } from '@/lib/ingest/scrape'
 
-vi.mock('axios')
-const mockedAxios = axios as Mocked<typeof axios>
+vi.mock('@/lib/ingest/safeFetch', () => ({ fetchHtml: vi.fn() }))
+const mockedFetchHtml = vi.mocked(fetchHtml)
 
 describe('scrapeUrl', () => {
   it('extracts text from headings, paragraphs and list items', async () => {
-    mockedAxios.get.mockResolvedValue({
-      data: `
+    mockedFetchHtml.mockResolvedValue(`
         <html>
           <body>
             <article>
@@ -24,12 +22,12 @@ describe('scrapeUrl', () => {
             </article>
           </body>
         </html>
-      `,
-    })
+      `
+    )
 
     const result = await scrapeUrl('https://example.com')
 
-    expect(mockedAxios.get).toHaveBeenCalledWith(
+    expect(mockedFetchHtml).toHaveBeenCalledWith(
       'https://example.com'
     )
 
@@ -39,8 +37,7 @@ describe('scrapeUrl', () => {
   })
 
   it('uses the first matching content container only', async () => {
-    mockedAxios.get.mockResolvedValue({
-      data: `
+    mockedFetchHtml.mockResolvedValue(`
         <html>
           <body>
             <div class="content">
@@ -52,8 +49,8 @@ describe('scrapeUrl', () => {
             </article>
           </body>
         </html>
-      `,
-    })
+      `
+    )
 
     const result = await scrapeUrl('https://example.com')
 
@@ -61,8 +58,7 @@ describe('scrapeUrl', () => {
   })
 
   it('ignores empty text nodes', async () => {
-    mockedAxios.get.mockResolvedValue({
-      data: `
+    mockedFetchHtml.mockResolvedValue(`
         <html>
           <body>
             <article>
@@ -72,8 +68,8 @@ describe('scrapeUrl', () => {
             </article>
           </body>
         </html>
-      `,
-    })
+      `
+    )
 
     const result = await scrapeUrl('https://example.com')
 
@@ -81,8 +77,7 @@ describe('scrapeUrl', () => {
   })
 
   it('returns an empty string when no matching container exists', async () => {
-    mockedAxios.get.mockResolvedValue({
-      data: `
+    mockedFetchHtml.mockResolvedValue(`
         <html>
           <body>
             <div>
@@ -90,8 +85,8 @@ describe('scrapeUrl', () => {
             </div>
           </body>
         </html>
-      `,
-    })
+      `
+    )
 
     const result = await scrapeUrl('https://example.com')
 
