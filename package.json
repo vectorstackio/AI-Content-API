@@ -6,7 +6,6 @@
     "dev": "next dev -p 3021",
     "build": "next build",
     "start": "next start -p 3021",
-    "test": "vitest run --coverage",
     "lint": "eslint",
     "codelint": "npm run lint src/ && tsc --noEmit",
     "prepare": "husky",

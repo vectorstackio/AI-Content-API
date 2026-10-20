@@ -100,3 +100,38 @@ exception for that fixture. Production-policy tests separately reject loopback.
 It verifies that the real Node HTTP/socket stack uses the validated snapshot and
 preserves Host; tests do not contact public websites. Restricted sandboxes may
 need permission to bind the loopback listening socket.
+
+## Shared-key access for this prototype
+
+Set `INGEST_API_KEY` to a long random secret in the backend's server environment.
+`POST /api/ingest` and `GET /api/query/[userId]` require the same value in the
+`x-api-key` header. Missing/incorrect headers return HTTP 401 with
+`{ "success": false, "error": "Unauthorized" }`. Missing/blank server configuration
+fails closed with HTTP 503 and a generic error. Checks happen before request
+parsing, scraping or database access. History responses are not cacheable.
+`POST /api/query` stays public with its existing rate limiting; public OPTIONS
+preflights remain available. The static GET /api/ingest response is unchanged.
+
+Never use `NEXT_PUBLIC_INGEST_API_KEY`, put the key in a URL, expose it through
+client props, or log request headers. The guard is marked `server-only`; it reads
+the key at request time and returns no credential details. No new dependencies
+or account/session infrastructure are required. Use HTTPS outside local development.
+
+### Separate Next.js frontend
+
+Browser code currently calling ingestion or history directly must stop doing so:
+it cannot safely hold this key. Move those calls into frontend server-only code
+(a Route Handler, Server Action or protected server-rendered administrative flow),
+configure the same secret in that frontend's server environment, and attach
+`x-api-key` only on the server-to-server request. Keep backend base URLs in server
+configuration for these calls, and disable caching of history requests/responses.
+Do not forward the key to the browser, an upstream error page or response headers.
+Public question requests can continue calling POST /api/query without a key.
+
+A publicly callable frontend proxy that automatically adds the key would recreate
+public access to ingestion/history. For this portfolio prototype, keep these
+operations in a private administrative/server-side workflow (or disable the public
+history UI) unless the frontend already restricts access to that workflow. A
+Server Action is also publicly reachable and is not access control by itself.
+A shared key grants access to all history IDs; this is not per-user ownership.
+No frontend repository changes were made here.

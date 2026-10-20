@@ -2,6 +2,7 @@ import { Socket } from 'node:net'
 import { beforeEach, vi } from 'vitest'
 
 // Never load developer credentials or connect real database clients in unit tests.
+vi.mock('server-only', () => ({}))
 vi.mock('dotenv', () => ({ config: vi.fn() }))
 vi.mock('mongoose', () => ({
   default: { connect: vi.fn() },

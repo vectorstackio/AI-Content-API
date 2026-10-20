@@ -1,6 +1,7 @@
 // app/api/ingest/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
+import { checkApiKey } from '@/lib/common/access'
 import { ClientError } from '@/lib/common/error'
 
 import { ingestUrl } from '@/lib/ingest'
@@ -10,11 +11,20 @@ export const runtime = 'nodejs'
 const headers = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
   'Access-Control-Max-Age': '86400',
+  'Cache-Control': 'no-store',
 }
 
 export async function POST(req: NextRequest) {
+  const accessError = checkApiKey(req)
+  if (accessError) {
+    return NextResponse.json(
+      { success: false, error: accessError.error },
+      { status: accessError.status, headers }
+    )
+  }
+
   try {
     const body = await req.json().catch(() => null)
 
@@ -70,11 +80,7 @@ export async function POST(req: NextRequest) {
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
+    headers,
   })
 }
 
