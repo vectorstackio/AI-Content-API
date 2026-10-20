@@ -1,4 +1,5 @@
-// lib/query/retrieve/__tests__/retrieve.empty.test.ts
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { MockedFunction, Mocked } from 'vitest'
 
 import { retrieveContext } from '@/lib/query/retrieve'
 import { redis } from '@/lib/common/redis'
@@ -6,40 +7,35 @@ import { queryVectors } from '@/lib/common/pinecone'
 import type { ScoredPineconeRecord } from '@pinecone-database/pinecone'
 import type { ChunkMetadata, UserType } from '@/types'
 
-jest.mock('@/lib/common/redis', () => ({
+vi.mock('@/lib/common/redis', () => ({
   redis: {
-    get: jest.fn(),
-    set: jest.fn(),
+    get: vi.fn(),
+    set: vi.fn(),
   },
 }))
 
-jest.mock('@/lib/common/pinecone', () => ({
-  queryVectors: jest.fn(),
+vi.mock('@/lib/common/pinecone', () => ({
+  queryVectors: vi.fn(),
 }))
 
-const response = {
+const response = vi.hoisted(() => ({
   data: [ ]
-}
+}))
 
-jest.mock('openai', () => {
-  return {
-    __esModule: true,
-    default: jest.fn(() => ({
-      embeddings: {
-        create: jest.fn(() => response),
-      },
-    })),
-  }
-})
+vi.mock('openai', () => ({
+  default: class {
+    embeddings = { create: vi.fn(async () => response) }
+  },
+}))
 
-const mockedRedis = redis as jest.Mocked<typeof redis>
-const mockedQueryVectors = queryVectors as jest.MockedFunction<
+const mockedRedis = redis as Mocked<typeof redis>
+const mockedQueryVectors = queryVectors as MockedFunction<
   typeof queryVectors
 >
 
 describe('retrieveContext', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('creates embedding when cache miss and throws if empty', async () => {
@@ -73,5 +69,7 @@ describe('retrieveContext', () => {
         userType: 'pupil' as unknown as UserType,
       })
     ).rejects.toThrow('Failed to create embedding')
+    expect(mockedQueryVectors).not.toHaveBeenCalled()
+    expect(mockedRedis.set).not.toHaveBeenCalled()
   })
 })

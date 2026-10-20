@@ -1,4 +1,4 @@
-// lib/query/prompt/__tests__/prompt.test.ts
+import { describe, it, expect } from 'vitest'
 
 import { buildPrompt } from '@/lib/query/prompt'
 

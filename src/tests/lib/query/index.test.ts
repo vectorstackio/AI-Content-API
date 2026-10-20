@@ -1,12 +1,5 @@
-// lib/query/__tests__/query.test.ts
-
-jest.mock('@pinecone-database/pinecone', () => {
-  return {
-    Pinecone: jest.fn().mockImplementation(() => ({
-      index: jest.fn(),
-    })),
-  }
-})
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { MockedFunction } from 'vitest'
 
 function createAsyncIterable(events: unknown[]) {
   return {
@@ -22,34 +15,34 @@ import { queryRagStream } from '@/lib/query'
 import { retrieveContext } from '@/lib/query/retrieve'
 import { buildPrompt } from '@/lib/query/prompt'
 
-jest.mock('@/lib/query/retrieve')
-jest.mock('../prompt')
+vi.mock('@/lib/query/retrieve', () => ({ retrieveContext: vi.fn() }))
+vi.mock('@/lib/query/prompt', () => ({ buildPrompt: vi.fn() }))
 
-jest.mock('openai', () => {
-  return {
-    __esModule: true,
-    default: jest.fn(() => ({
-      responses: {
-        create: jest.fn(() => createAsyncIterable([
-          { type: 'response.output_text.delta', delta: 'Hello ' },
-          { type: 'response.output_text.delta', delta: 'world' },
-        ])),
-      },
-    })),
-  }
-})
+const { create } = vi.hoisted(() => ({ create: vi.fn() }))
 
-const mockedRetrieveContext = retrieveContext as jest.MockedFunction<
+vi.mock('openai', () => ({
+  default: class {
+    responses = { create }
+  },
+}))
+
+const mockedRetrieveContext = retrieveContext as MockedFunction<
   typeof retrieveContext
 >
 
-const mockedBuildPrompt = buildPrompt as jest.MockedFunction<
+const mockedBuildPrompt = buildPrompt as MockedFunction<
   typeof buildPrompt
 >
 
 describe('queryRagStream', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
+    create.mockReturnValue(createAsyncIterable([
+      { type: 'response.created' },
+      { type: 'response.output_text.delta', delta: 'Hello ' },
+      { type: 'response.output_text.done', text: 'ignored' },
+      { type: 'response.output_text.delta', delta: 'world' },
+    ]))
   })
 
   it('returns "I don’t know" stream when no context is found', async () => {
@@ -67,6 +60,8 @@ describe('queryRagStream', () => {
     }
 
     expect(streamed).toEqual(['I don\'t know'])
+    expect(create).not.toHaveBeenCalled()
+    expect(result.status).toBe('unknown')
 
     const final = await result.getFinal()
 
@@ -102,6 +97,7 @@ describe('queryRagStream', () => {
     }
 
     expect(streamed).toEqual(['Hello ', 'world'])
+    expect(result.status).toBe('answered')
 
     const final = await result.getFinal()
 
@@ -140,7 +136,8 @@ describe('queryRagStream', () => {
       streamed.push(chunk)
     }
 
-    expect(streamed).not.toBe('')
+    expect(streamed).toEqual(['Hello ', 'world'])
+    expect(result.status).toBe('answered')
 
     const final = await result.getFinal()
 

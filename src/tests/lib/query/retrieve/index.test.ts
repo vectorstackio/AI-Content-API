@@ -1,57 +1,44 @@
-// src/lib/query/retrieve/__tests__/retrieve.test.ts
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { MockedFunction, Mocked } from 'vitest'
 
 import { retrieveContext } from '@/lib/query/retrieve'
 import { redis } from '@/lib/common/redis'
 import { queryVectors } from '@/lib/common/pinecone'
-//import OpenAI from 'openai'
 import type { ScoredPineconeRecord } from '@pinecone-database/pinecone'
 import type { ChunkMetadata, UserType } from '@/types'
 
-jest.mock('@/lib/common/redis', () => ({
+vi.mock('@/lib/common/redis', () => ({
   redis: {
-    get: jest.fn(),
-    set: jest.fn(),
+    get: vi.fn(),
+    set: vi.fn(),
   },
 }))
 
-jest.mock('@/lib/common/pinecone', () => ({
-  queryVectors: jest.fn(),
+vi.mock('@/lib/common/pinecone', () => ({
+  queryVectors: vi.fn(),
 }))
 
-beforeEach(() => {
-  global.fetch = jest.fn()
-})
-
-afterEach(() => {
-  jest.restoreAllMocks()
-})
-
-const response = {
+const response = vi.hoisted(() => ({
   data: [
     { embedding: [0.1, 0.2] },
     { embedding: [0.3, 0.4] },
   ],
-}
+}))
 
-jest.mock('openai', () => {
-  return {
-    __esModule: true,
-    default: jest.fn(() => ({
-      embeddings: {
-        create: jest.fn(() => response),
-      },
-    })),
-  }
-})
+vi.mock('openai', () => ({
+  default: class {
+    embeddings = { create: vi.fn(async () => response) }
+  },
+}))
 
-const mockedRedis = redis as jest.Mocked<typeof redis>
-const mockedQueryVectors = queryVectors as jest.MockedFunction<
+const mockedRedis = redis as Mocked<typeof redis>
+const mockedQueryVectors = queryVectors as MockedFunction<
   typeof queryVectors
 >
 
 describe('retrieveContext', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('returns cached retrieval if present', async () => {
@@ -75,7 +62,6 @@ describe('retrieveContext', () => {
   })
 
   it('uses cached embedding and returns filtered results', async () => {
-    // no retrieval cache
     mockedRedis.get
       .mockResolvedValueOnce(null) // retrieval cache
       .mockResolvedValueOnce(JSON.stringify([0.1, 0.2])) // embedding cache
@@ -113,8 +99,11 @@ describe('retrieveContext', () => {
       },
     ])
 
-    expect(mockedQueryVectors).toHaveBeenCalled()
-    expect(mockedRedis.set).toHaveBeenCalledTimes(1) // embedding + retrieval cache
+    expect(mockedQueryVectors).toHaveBeenCalledWith({
+      embedding: [0.1, 0.2],
+      userType: 'pupil',
+    })
+    expect(mockedRedis.set).toHaveBeenCalledTimes(1) // retrieval cache only
   })
 
   it('creates embedding when cache miss and queries pinecone', async () => {
@@ -147,7 +136,16 @@ describe('retrieveContext', () => {
       },
     ])
 
-    expect(mockedRedis.set).toHaveBeenCalled()
-    expect(mockedQueryVectors).toHaveBeenCalled()
+    expect(mockedRedis.set).toHaveBeenCalledTimes(2)
+    expect(mockedRedis.set).toHaveBeenCalledWith(
+      'embedding:text-embedding-3-small:test', JSON.stringify([0.1, 0.2]), 'EX', 604800
+    )
+    expect(mockedRedis.set).toHaveBeenCalledWith(
+      'retrieval:v1:pupil:test', JSON.stringify(result), 'EX', 3600
+    )
+    expect(mockedQueryVectors).toHaveBeenCalledWith({
+      embedding: [0.1, 0.2],
+      userType: 'pupil',
+    })
   })
 })

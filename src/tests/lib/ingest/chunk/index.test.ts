@@ -1,14 +1,14 @@
-// lib/ingest/chunk/__tests__/chunk.ts
+import { describe, it, expect } from 'vitest'
 
 import { chunkText } from '@/lib/ingest/chunk'
+import { BATCH_SIZE } from '@/lib/common/constants'
 
 describe('chunkText', () => {
   it('uses default batch size from constants', () => {
-    const text = 'one two three four five six'
+    const words = Array.from({ length: BATCH_SIZE + 1 }, (_, i) => `word${i}`)
+    const result = chunkText(words.join(' '))
 
-    const result = chunkText(text)
-
-    expect(result.length).toBeGreaterThan(0)
+    expect(result).toEqual([words.slice(0, BATCH_SIZE).join(' '), words[BATCH_SIZE]])
   })
 
   it('splits text into correct sized chunks', () => {

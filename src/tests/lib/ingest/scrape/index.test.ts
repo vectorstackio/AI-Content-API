@@ -1,10 +1,11 @@
-// lib/ingest/scrape/__tests__/scrape.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import type { Mocked } from 'vitest'
 
 import axios from 'axios'
 import { scrapeUrl } from '@/lib/ingest/scrape'
 
-jest.mock('axios')
-const mockedAxios = axios as jest.Mocked<typeof axios>
+vi.mock('axios')
+const mockedAxios = axios as Mocked<typeof axios>
 
 describe('scrapeUrl', () => {
   it('extracts text from headings, paragraphs and list items', async () => {

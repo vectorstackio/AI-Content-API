@@ -1,26 +1,22 @@
-// lib/common/db/__tests__/helpers.test.js
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { Mock } from 'vitest'
 
 import { dbConnect } from '@/lib/common/db'
 import mongoose from 'mongoose'
 import config from '@/lib/common/config'
 
-// jest.mock('mongoose', () => ({
-//   connect: jest.fn(),
-// }))
 
-jest.mock('@/lib/common/config', () => ({
-  db: {
-    url: '',
-  },
+vi.mock('@/lib/common/config', () => ({
+  default: { db: { url: '' } },
 }))
 
 const mockMongoose = mongoose as unknown as {
-  connect: jest.Mock
+  connect: Mock
 }
 
 describe('dbConnect', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('throws error when db url is missing', async () => {

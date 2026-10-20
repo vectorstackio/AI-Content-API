@@ -1,26 +1,27 @@
-// lib/common/pinecone/__tests__/pinecone.test.js
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { Mock } from 'vitest'
 
 import { upsertVectors, queryVectors, deleteVectors, deleteAll } from '@/lib/common/pinecone'
 import { index } from '@/lib/common/pinecone/client'
 import type { ChunkMetadata } from '@/types'
 
-jest.mock('@/lib/common/pinecone/client', () => ({
+vi.mock('@/lib/common/pinecone/client', () => ({
   index: {
-    upsert: jest.fn(),
-    query: jest.fn(),
-    deleteMany: jest.fn(),
+    upsert: vi.fn(),
+    query: vi.fn(),
+    deleteMany: vi.fn(),
   },
 }))
 
 const mockIndex = index as unknown as {
-  upsert: jest.Mock
-  query: jest.Mock
-  deleteMany: jest.Mock
+  upsert: Mock
+  query: Mock
+  deleteMany: Mock
 }
 
 describe('upsertVectors', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('calls index.upsert with correct payload', async () => {
@@ -77,7 +78,7 @@ describe('deleteAll', () => {
 
 describe('queryVectors', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('queries without userType filter', async () => {
