@@ -11,6 +11,9 @@
     "codelint": "npm run lint src/ && tsc --noEmit",
     "prepare": "husky",
     "test:watch": "vitest",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
