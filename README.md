@@ -37,6 +37,34 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Backend tests
 
+### Pinecone vector ID transition
+
+Ingestion IDs now use `sha256(url)-userType-contentHash-chunk-index`. The URL hash
+keeps IDs bounded; the original URL and audience remain in metadata for querying
+and deletion. The external ingestion API is unchanged.
+
+Existing vectors remain readable, but changing the ID format does not restore
+vectors previously overwritten by another audience. Unchanged content is still
+skipped using the database content hash, so simply ingesting again will not
+migrate those records.
+
+For this prototype, the simplest clean rebuild is to pause ingestion, back up the
+URL/audience database records, clear only this application's vectors in its
+Pinecone index/namespace, and remove the corresponding ingestion database records.
+Then re-ingest every saved URL/audience pair and verify retrieval for all three
+audiences before resuming ingestion. Do not clear a shared index or unrelated data.
+This is an operator procedure; deployment does not automatically delete records.
+
+For a selective rebuild, delete vectors with **both** `url` and `userType` metadata
+filters, remove the matching database record, then re-ingest that pair. Repeat for
+every affected audience. Metadata deletion matches legacy and new IDs, avoiding
+duplicates. Previously overwritten audiences must also be rebuilt.
+
+Replacement still deletes existing vectors before embedding/upserting. A failed
+upsert propagates without updating the database, but can leave the replaced
+audience without vectors (or with a partial upsert). Replacement ordering and
+cross-store consistency are deferred; this change does not add rollback.
+
 Use a supported Node.js runtime (Node 24 LTS recommended) and `npm ci`.
 
 - `npm test`: run the complete Vitest suite once with V8 coverage.

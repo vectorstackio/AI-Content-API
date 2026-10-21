@@ -67,8 +67,9 @@ export const ingestUrl = async (url: string, userType: UserType) => {
   const embeddings = await embedChunks(chunks)
 
   // 5. Upsert to Pinecone
+  const urlHash = createHash(url)
   const vectors = chunks.map((chunk, i) => ({
-    id: `${url}-${contentHash}-chunk-${i}`,
+    id: `${urlHash}-${userType}-${contentHash}-chunk-${i}`,
     values: embeddings[i],
     metadata: {
       url,
@@ -93,7 +94,7 @@ const createHash = (text: string) => {
 
 const checkUrlExists = async (url: string, userType: UserType, contentHash: string): Promise<CheckUrlExistsResult> => {
   const response = await fetch(
-    `${config.app.apiUrl}/api/v02/db/hubAiUrls?url=${url}&userType=${userType}&tspAuthToken=${config.app.apiAuthToken}`,
+    `${config.app.apiUrl}/api/v02/db/hubAiUrls?url=${encodeURIComponent(url)}&userType=${userType}&tspAuthToken=${config.app.apiAuthToken}`,
     {
       method: 'GET',
       headers: {
