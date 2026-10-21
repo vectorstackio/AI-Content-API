@@ -33,3 +33,11 @@ jobs:
 
       - name: Build application
         run: npm run build
+          env:
+            OPENAI_API_KEY: ci-placeholder-key
+            INGEST_API_KEY: ci-placeholder-key
+            PINECONE_API_KEY: ci-placeholder-key
+            PINECONE_INDEX_NAME: ci-placeholder-key
+            DB_URL: ci-placeholder-key
+            API_AUTH_TOKEN: ci-placeholder-key
+            API_URL: ci-placeholder-key
