@@ -1,181 +1,73 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-
-import {
-  safeCreateMessage,
-  getConversationHistory,
-} from '@/lib/common/db'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { safeCreateMessage, getConversationHistory } from '@/lib/common/db'
 import config from '@/lib/common/config'
 
-
-
+const fetchMock = vi.fn()
+const message = { userId: 'user-1', role: 'assistant', content: 'hello', queryId: 'query-1' }
 beforeEach(() => {
-  global.fetch = vi.fn()
+  fetchMock.mockReset()
+  vi.stubGlobal('fetch', fetchMock)
 })
-
-afterEach(() => {
-  vi.restoreAllMocks()
-})
-
-
-
-
-
-
-
-
-
-
-
 
 describe('safeCreateMessage', () => {
-  const mockFetch = vi.fn()
-
-  beforeEach(() => {
-    global.fetch = mockFetch
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('returns success true when fetch succeeds', async () => {
-    mockFetch.mockResolvedValue({ ok: true })
-
-    const data = {
-      userId: '1',
-      role: 'assistant',
-      content: 'hello',
-      queryId: 'query-1',
-    }
-
-    const result = await safeCreateMessage(data)
-
-    expect(mockFetch).toHaveBeenCalledTimes(1)
-
-    expect(mockFetch).toHaveBeenCalledWith(
+  it('POSTs message JSON and reports success for a successful HTTP response', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true })
+    await expect(safeCreateMessage(message)).resolves.toEqual({ success: true })
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
       `${config.app.apiUrl}/api/v02/db/hubAiMessages?tspAuthToken=${config.app.apiAuthToken}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(message) }
     )
-
-    expect(result).toEqual({
-      success: true,
-    })
   })
 
-  it('returns error message when fetch throws Error', async () => {
-    mockFetch.mockRejectedValue(new Error('Network failure'))
-
-    const data = {
-      userId: '1',
-      role: 'assistant',
-      content: 'hello',
-      queryId: 'query-1',
-    }
-
-    const result = await safeCreateMessage(data)
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Network failure',
-    })
+  it('reports HTTP errors as a failed best-effort write', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503 })
+    await expect(safeCreateMessage(message)).resolves.toEqual({ success: false, error: 'Message persistence failed (503)' })
   })
 
-  it('returns Unknown error when non-Error is thrown', async () => {
-    mockFetch.mockRejectedValue('something weird')
-
-    const data = {
-      userId: '1',
-      role: 'assistant',
-      content: 'hello',
-      queryId: 'query-1',
-    }
-
-    const result = await safeCreateMessage(data)
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Unknown error',
-    })
+  it.each([new Error('Network failure'), 'unexpected'])('contains network failure %s', async error => {
+    fetchMock.mockRejectedValueOnce(error)
+    await expect(safeCreateMessage(message)).resolves.toEqual({ success: false, error: error instanceof Error ? error.message : 'Unknown error' })
   })
 })
 
 describe('getConversationHistory', () => {
-  const mockFetch = vi.fn()
-
-  beforeEach(() => {
-    global.fetch = mockFetch
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('returns messages from api response', async () => {
-    const mockMessages = [
-      {
-        id: '1',
-        message: 'hello',
-      },
-      {
-        id: '2',
-        message: 'world',
-      },
-    ]
-
-    mockFetch.mockResolvedValue({
-      json: async () => ({
-        records: mockMessages,
-      }),
-    })
-
-    const result = await getConversationHistory('user-123', 10)
-
-    expect(mockFetch).toHaveBeenCalledTimes(1)
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      `${config.app.apiUrl}/api/v02/db/hubAiMessages?userId=user-123&limit=10&tspAuthToken=${config.app.apiAuthToken}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    )
-
-    expect(result).toEqual(mockMessages)
-  })
-
-  it('uses default limit when not supplied', async () => {
-    mockFetch.mockResolvedValue({
-      json: async () => ({
-        records: [],
-      }),
-    })
-
-    await getConversationHistory('user-456')
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      `${config.app.apiUrl}/api/v02/db/hubAiMessages?userId=user-456&limit=20&tspAuthToken=${config.app.apiAuthToken}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+  it('requests the chosen user and limit and returns records', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [message] }) })
+    await expect(getConversationHistory('user-1', 10)).resolves.toEqual([message])
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      `${config.app.apiUrl}/api/v02/db/hubAiMessages?userId=user-1&limit=10&tspAuthToken=${config.app.apiAuthToken}`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
     )
   })
 
-  it('returns empty array when records is undefined', async () => {
-    mockFetch.mockResolvedValue({
-      json: async () => ({}),
-    })
+  it('encodes IDs so user input cannot inject upstream DB query parameters', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [] }) })
+    const userId = 'alice&limit=999&userId=bob#fragment'
+    await expect(getConversationHistory(userId)).resolves.toEqual([])
+    const url = new URL(fetchMock.mock.calls[0][0])
+    expect(url.searchParams.getAll('userId')).toEqual([userId])
+    expect(url.searchParams.getAll('limit')).toEqual(['20'])
+  })
 
-    const result = await getConversationHistory('user-789')
+  it('returns empty history for absent records', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    await expect(getConversationHistory('user-1')).resolves.toEqual([])
+  })
 
-    expect(result).toEqual([])
+  it('rejects non-array records', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ records: {} }) })
+    await expect(getConversationHistory('user-1')).rejects.toThrow('Invalid conversation history response')
+  })
+
+  it('rejects HTTP errors even when the body resembles an empty successful result', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({}) })
+    await expect(getConversationHistory('user-1')).rejects.toThrow('Conversation history request failed (401)')
+  })
+
+  it('propagates network and invalid JSON failures', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('Connection refused'))
+    await expect(getConversationHistory('user-1')).rejects.toThrow('Connection refused')
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => { throw new SyntaxError('Invalid JSON') } })
+    await expect(getConversationHistory('user-1')).rejects.toThrow('Invalid JSON')
   })
 })

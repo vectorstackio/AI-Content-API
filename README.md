@@ -67,7 +67,9 @@ cross-store consistency are deferred; this change does not add rollback.
 
 Use a supported Node.js runtime (Node 24 LTS recommended) and `npm ci`.
 
-- `npm test`: run the complete Vitest suite once with V8 coverage.
+- `npm run test:coverage`: run the complete Vitest suite once with V8 coverage.
+- `npm run test:run`: run the suite once without coverage.
+- `npm test`: start Vitest in its default interactive mode.
 - `npm run test:watch`: watch tests during development.
 - `npm run typecheck`: check production and test TypeScript.
 - `npm run lint -- src/ vitest.config.mts`: lint application, tests and test configuration.
@@ -89,16 +91,56 @@ JavaScript Mongoose models are outside this TypeScript coverage scope.
 Reports are generated in `coverage/`: `index.html`, `lcov.info` and
 `coverage-summary.json`.
 
-The migrated baseline is 41 tests in 11 files. Full-source coverage is 48.37%
-statements, 37.86% branches, 60% functions and 48.79% lines. Thresholds start at
-48/37/60/48 respectively to prevent regressions. The old Jest 80% thresholds did
-not explicitly include unimported production modules; they are not comparable
-to this full-source baseline. Raise these thresholds as coverage grows.
+The current suite has 226 tests in 19 files. Full-source coverage is 98.46%
+statements, 96.24% branches, 97.18% functions and 99.13% lines. The review baseline
+was 148 tests with 93.35% statements, 83.90% branches, 89.39% functions and 93.77%
+lines. All three API routes have 100% line and function coverage. Global minimums
+are 95% statements, 90% branches, 95% functions and 95% lines; API routes also
+require 95% statements, 85% branches and 100% functions/lines.
 
-Next tests should target ingestion orchestration and failure ordering; route
-validation, CORS and streaming lifecycle; safe URL fetching/redirects; database
-HTTP failures; and Redis concurrency/cache failures. Production behaviour was
-preserved during migration, including `chunkText('')` returning `['']`.
+Route tests cover authentication, invalid input, rate limiting, streaming failures,
+incomplete OpenAI responses, cooperative stream cancellation and best-effort
+message persistence. DB helpers check HTTP status and encode history IDs.
+Ingestion tests characterize current failure ordering: replacements still delete
+old vectors before embedding/upload, partial uploads can remain searchable, and
+failed DB writes do not roll back Pinecone. There is no activation mechanism,
+post-activation cleanup, rollback or concurrency protection to test yet.
+
+Reset individual dependency mocks rather than using `vi.resetAllMocks()` inside
+tests: a broad reset can restore the real socket implementation underneath the
+network guard. Only the isolated loopback transport fixture restores it explicitly.
+
+GitHub Actions runs on pushes and pull requests with Node 24, `npm ci`, coverage,
+TypeScript, ESLint and a production build. It uploads coverage reports, uses a
+read-only repository token and supplies placeholder service configuration. Redis
+connects lazily, so importing routes during a build does not need a Redis server.
+The starter backend page still downloads Google Fonts at build time; it needs
+network access to Google Fonts, but no OpenAI/Pinecone/Redis/MongoDB/DB API service
+or production credentials are needed to build.
+
+Remaining integration risks include real browser disconnects, OpenAI transport
+abort timing, Pinecone eventual consistency, concurrent ingestion/rate limiting,
+and external DB guarantees. Unit tests mock these services. Request aborts and
+response cancellation forward an abort signal to the OpenAI SDK before requesting
+iterator closure; retrieval and DB operations do not currently accept that signal.
+
+### Query stream completion and history
+
+The query endpoint preserves its plain-text streaming format. Only normally
+completed, uncancelled assistant answers are saved to history. Failed, incomplete
+and cancelled answers are omitted; the original user message can remain. Message
+persistence is best effort: a failed write does not fail a completed answer, and
+unexpected persistence/iterator-cleanup rejections are caught.
+
+The frontend must consume the response body through a clean EOF before treating an
+answer as complete, and handle rejected `reader.read()` or `response.text()` calls
+as failures, even after displaying partial text. HTTP 200 and `X-AI-Status: answered`
+are sent before generation completes; the header describes context availability,
+not final success. Explicit OpenAI failure/incomplete events and missing completion
+events error the response body. Headers cannot change after streaming starts.
+No frontend code or response format changed. An explicit terminal success/error
+event would require a protocol/frontend change (for example SSE) to also detect
+intermediaries that mask a failed body as a clean EOF.
 
 ## URL ingestion security
 

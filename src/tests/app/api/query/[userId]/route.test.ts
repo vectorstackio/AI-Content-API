@@ -7,7 +7,11 @@ import { dbConnect, getConversationHistory } from '@/lib/common/db'
 
 vi.mock('@/lib/common/db', () => ({ dbConnect: vi.fn(), getConversationHistory: vi.fn() }))
 afterEach(() => vi.unstubAllEnvs())
-beforeEach(() => vi.stubEnv('INGEST_API_KEY', 'test-access-key'))
+beforeEach(() => {
+  vi.mocked(dbConnect).mockReset()
+  vi.mocked(getConversationHistory).mockReset()
+  vi.stubEnv('INGEST_API_KEY', 'test-access-key')
+})
 
 function request(key?: string) {
   return new NextRequest('http://localhost/api/query/user-1', {
@@ -48,5 +52,31 @@ describe('GET /api/query/[userId] access', () => {
     const response = await OPTIONS()
     expect(response.status).toBe(204)
     expect(response.headers.get('Access-Control-Allow-Headers')).toContain('X-API-Key')
+  })
+})
+
+describe('history validation and failures', () => {
+  it.each(['', '   '])('rejects invalid user ID %j before database access', async userId => {
+    const response = await GET(request('test-access-key'), { params: Promise.resolve({ userId }) })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ success: false, error: 'Missing or invalid userId' })
+    expect(dbConnect).not.toHaveBeenCalled()
+    expect(getConversationHistory).not.toHaveBeenCalled()
+  })
+
+  it.each([new Error('Database unavailable'), 'unexpected'])('handles history failure %s', async error => {
+    vi.mocked(getConversationHistory).mockRejectedValueOnce(error)
+    const response = await GET(request('test-access-key'), context())
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ success: false, error: error instanceof Error ? error.message : 'Unknown error' })
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+  })
+
+  it('handles connection failures without querying history', async () => {
+    vi.mocked(dbConnect).mockRejectedValueOnce(new Error('Connection refused'))
+    const response = await GET(request('test-access-key'), context())
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ success: false, error: 'Connection refused' })
+    expect(getConversationHistory).not.toHaveBeenCalled()
   })
 })

@@ -102,8 +102,10 @@ const checkUrlExists = async (url: string, userType: UserType, contentHash: stri
       }
     }
   )
+  if (!response.ok) throw new Error(`Ingestion lookup failed (${response.status})`)
   const data = await response.json()
   const records = data.records ?? []
+  if (!Array.isArray(records)) throw new Error('Invalid ingestion lookup response')
   const existing = records.length ? records[0] : null
 
   if (existing) {
@@ -122,11 +124,12 @@ const updateDb = async (url: string, content: string, contentHash: string, userT
     rest.content = content
     rest.contentHash = contentHash
     rest.userType = userType
-    await fetch(`${config.app.apiUrl}/api/v02/db/hubAiUrls/${_id}?tspAuthToken=${config.app.apiAuthToken}`, {
+    const response = await fetch(`${config.app.apiUrl}/api/v02/db/hubAiUrls/${_id}?tspAuthToken=${config.app.apiAuthToken}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rest),
     })
+    if (!response.ok) throw new Error(`Ingestion persistence failed (${response.status})`)
     return rest
   }
   return createRecord(url, content, contentHash, userType)
@@ -134,10 +137,11 @@ const updateDb = async (url: string, content: string, contentHash: string, userT
 
 const createRecord = async (url: string, content: string, contentHash: string, userType: string) => {
   const data = { url, content, contentHash, userType }
-  await fetch(`${config.app.apiUrl}/api/v02/db/hubAiUrls?tspAuthToken=${config.app.apiAuthToken}`, {
+  const response = await fetch(`${config.app.apiUrl}/api/v02/db/hubAiUrls?tspAuthToken=${config.app.apiAuthToken}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   })
+  if (!response.ok) throw new Error(`Ingestion persistence failed (${response.status})`)
   return data
 }

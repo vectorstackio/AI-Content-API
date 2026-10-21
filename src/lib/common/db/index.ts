@@ -19,11 +19,12 @@ export async function safeCreateMessage(data: Message): Promise<{
   error?: string
 }> {
   try {
-    await fetch(`${config.app.apiUrl}/api/v02/db/hubAiMessages?tspAuthToken=${config.app.apiAuthToken}`, {
+    const response = await fetch(`${config.app.apiUrl}/api/v02/db/hubAiMessages?tspAuthToken=${config.app.apiAuthToken}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
+    if (!response.ok) throw new Error(`Message persistence failed (${response.status})`)
 
     return {
       success: true,
@@ -44,7 +45,7 @@ export async function safeCreateMessage(data: Message): Promise<{
  */
 export async function getConversationHistory(userId: string, limit: number = 20): Promise<Message[]> {
   const response = await fetch(
-    `${config.app.apiUrl}/api/v02/db/hubAiMessages?userId=${userId}&limit=${limit}&tspAuthToken=${config.app.apiAuthToken}`,
+    `${config.app.apiUrl}/api/v02/db/hubAiMessages?userId=${encodeURIComponent(userId)}&limit=${limit}&tspAuthToken=${config.app.apiAuthToken}`,
     {
       method: 'GET',
       headers: {
@@ -52,8 +53,10 @@ export async function getConversationHistory(userId: string, limit: number = 20)
       }
     }
   )
+  if (!response.ok) throw new Error(`Conversation history request failed (${response.status})`)
   const data = await response.json()
   const messages = data.records ?? []
+  if (!Array.isArray(messages)) throw new Error('Invalid conversation history response')
 
   return messages
 }

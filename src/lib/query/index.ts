@@ -1,7 +1,6 @@
 // lib/query/index.ts
 
 import OpenAI from 'openai'
-import type { ResponseStreamEvent } from 'openai/resources/responses/responses'
 
 import config from '@/lib/common/config'
 import * as constants from '@/lib/common/constants'
@@ -42,16 +41,20 @@ export type QueryResponse =
 export async function queryRagStream({
   question,
   userType,
-}: QueryRagParams) {
+}: QueryRagParams, { signal }: { signal?: AbortSignal } = {}) {
+
+  signal?.throwIfAborted()
 
   const chunks = await retrieveContext({
     question,
     userType,
   })
+  signal?.throwIfAborted()
 
   // 🟡 NO CONTEXT → unknown status
   if (!chunks.length) {
     async function* emptyStream() {
+      signal?.throwIfAborted()
       yield 'I don\'t know'
     }
 
@@ -70,22 +73,30 @@ export async function queryRagStream({
     contextChunks: chunks.map((c) => c.text),
   })
 
-  const response: AsyncIterable<ResponseStreamEvent> =
+  const response =
     await openai.responses.create({
       model: constants.CHAT_MODEL,
       input: prompt,
       stream: true,
-    })
+    }, { signal })
 
   let fullAnswer = ''
 
   async function* stream() {
+    let completed = false
     for await (const event of response) {
+      signal?.throwIfAborted()
+      if (event.type === 'error') throw new Error(event.message)
+      if (event.type === 'response.failed') throw new Error(event.response.error?.message ?? 'OpenAI response failed')
+      if (event.type === 'response.incomplete') throw new Error('OpenAI response incomplete')
+      if (event.type === 'response.completed') completed = true
       if (event.type === 'response.output_text.delta') {
         fullAnswer += event.delta
         yield event.delta
       }
     }
+    signal?.throwIfAborted()
+    if (!completed) throw new Error('OpenAI stream ended before completion')
   }
 
   return {

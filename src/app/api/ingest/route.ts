@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkApiKey } from '@/lib/common/access'
 import { ClientError } from '@/lib/common/error'
+import { z } from 'zod'
 
 import { ingestUrl } from '@/lib/ingest'
 
@@ -36,14 +37,15 @@ export async function POST(req: NextRequest) {
     if (!url) {
       return NextResponse.json(
         { success: false, error: 'Missing or invalid URL' },
-        { status: 400 }
+        { status: 400, headers }
       )
     }
 
-    const userType =
-      typeof body?.userType === 'string' && body.userType.trim().length > 0
-        ? body.userType.trim()
-        : null
+    const audience = z.enum(['pupil', 'teacher', 'tutor']).safeParse(
+      typeof body?.userType === 'string' ? body.userType.trim() : body?.userType
+    )
+    if (!audience.success) throw new ClientError('Missing or invalid userType')
+    const userType = audience.data
 
     const result = await ingestUrl(url, userType)
 

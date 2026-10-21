@@ -44,7 +44,10 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
-    'src/scripts/**'
+    'src/scripts/**',
+    'scripts/**',
+    'src/app/layout.js',
+    'jest.config.js'
   ]),
 ])
 

@@ -21,10 +21,9 @@ const headers = {
 
 export async function POST(req: NextRequest) {
   try {
-    await dbConnect()
-
-    const body = await req.json()
+    const body = await req.json().catch(() => null)
     const validated = querySchema.parse(body)
+    await dbConnect()
     const { userId } = validated
     const queryId = crypto.randomUUID()
 
@@ -42,13 +41,15 @@ export async function POST(req: NextRequest) {
           success: false,
           error: 'Too many requests. Please wait a moment.',
         },
-        { status: 429 }
+        { status: 429, headers }
       )
     }
 
     const encoder = new TextEncoder()
 
-    const { stream, status } = await queryRagStream(validated)
+    const upstreamAbort = new AbortController()
+    const signal = AbortSignal.any([req.signal, upstreamAbort.signal])
+    const { stream, status } = await queryRagStream(validated, { signal })
 
     // 🟢 save user message
     await safeCreateMessage({
@@ -56,41 +57,53 @@ export async function POST(req: NextRequest) {
       role: 'user',
       content: validated.question,
       queryId: queryId,
-    })
+    }).catch(() => undefined)
 
     let fullAnswer = ''
+    let cancelled = false
+    const iterator = stream[Symbol.asyncIterator]()
+    const stopUpstream = async () => {
+      upstreamAbort.abort()
+      try {
+        await iterator.return?.()
+      } catch {
+        // Cancellation/cleanup failures must not reject the response lifecycle.
+      }
+    }
 
     const streamResponse = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of stream) {
+          while (!cancelled) {
+            const { value: chunk, done } = await iterator.next()
+            if (cancelled) return
+            signal.throwIfAborted()
+            if (done) break
             fullAnswer += chunk
             controller.enqueue(encoder.encode(chunk))
           }
-
+          if (cancelled) return
           controller.close()
+        } catch (err) {
+          if (cancelled) return
+          controller.error(err)
+          await stopUpstream()
+          return
+        }
 
-          // 🟢 save assistant message AFTER stream ends
+        // Best-effort persistence must not delay EOF or error a closed stream.
+        if (!cancelled && !req.signal.aborted) {
           await safeCreateMessage({
             userId: userId ?? ip,
             role: 'assistant',
             content: fullAnswer,
-            queryId: queryId,
-          })
-
-        } catch (err) {
-          controller.error(err)
-
-          // optional: still persist partial answer
-          if (fullAnswer) {
-            await safeCreateMessage({
-              userId: userId ?? ip,
-              role: 'assistant',
-              content: fullAnswer,
-              queryId: queryId,
-            })
-          }
+            queryId,
+          }).catch(() => undefined)
         }
+      },
+      async cancel() {
+        cancelled = true
+        await stopUpstream()
       },
     })
 

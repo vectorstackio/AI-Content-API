@@ -4,10 +4,23 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      OPENAI_API_KEY: ci-placeholder-key
+      INGEST_API_KEY: ci-placeholder-key
+      PINECONE_API_KEY: ci-placeholder-key
+      PINECONE_INDEX_NAME: ci-test-index
+      DB_URL: mongodb://127.0.0.1:27017/ci-unused
+      API_AUTH_TOKEN: ci-placeholder-token
+      API_URL: https://database.invalid
 
     steps:
       - name: Checkout repository
@@ -25,6 +38,15 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Check TypeScript
         run: npx tsc --noEmit
 
@@ -33,11 +55,3 @@ jobs:
 
       - name: Build application
         run: npm run build
-        env:
-          OPENAI_API_KEY: ci-placeholder-key
-          INGEST_API_KEY: ci-placeholder-key
-          PINECONE_API_KEY: ci-placeholder-key
-          PINECONE_INDEX_NAME: ci-placeholder-key
-          DB_URL: ci-placeholder-key
-          API_AUTH_TOKEN: ci-placeholder-key
-          API_URL: ci-placeholder-key

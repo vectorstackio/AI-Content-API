@@ -25,9 +25,15 @@ export async function GET(
   }
 
   try {
-    await dbConnect()
-
     const { userId } = await context.params
+    if (typeof userId !== 'string' || !userId.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Missing or invalid userId' },
+        { status: 400, headers }
+      )
+    }
+
+    await dbConnect()
 
     const messages = await getConversationHistory(userId)
 
@@ -55,4 +61,4 @@ export async function OPTIONS() {
     headers
   })
 }
-    
+

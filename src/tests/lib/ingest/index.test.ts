@@ -25,10 +25,13 @@ const ids = () => [...stored.keys()]
 const db = vi.fn()
 
 beforeEach(() => {
-  vi.resetAllMocks()
+  for (const mock of [scrapeUrl, chunkText, embedChunks]) vi.mocked(mock).mockReset()
+  upsert.mockReset()
+  remove.mockReset()
+  db.mockReset()
   stored.clear()
   vi.stubGlobal('fetch', db)
-  db.mockResolvedValue({ json: async () => ({ records: [] }) })
+  db.mockResolvedValue({ ok: true, json: async () => ({ records: [] }) })
   vi.mocked(scrapeUrl).mockResolvedValue(text)
   vi.mocked(chunkText).mockReturnValue(['first chunk', 'second chunk'])
   vi.mocked(embedChunks).mockResolvedValue([[0.1, 0.2], [0.3, 0.4]])
@@ -88,7 +91,7 @@ describe('ingestUrl', () => {
     await ingestUrl(`${url}/other`, 'pupil')
     const untouched = ids()
     stored.set(`${url}-oldhash-chunk-0`, { id: `${url}-oldhash-chunk-0`, values: [1], metadata: { url, userType: 'pupil', chunk: 'old' } })
-    db.mockResolvedValueOnce({ json: async () => ({ records: [{ _id: 'existing', url, userType: 'pupil', contentHash: 'oldhash' }] }) })
+    db.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [{ _id: 'existing', url, userType: 'pupil', contentHash: 'oldhash' }] }) })
     await ingestUrl(url, 'pupil')
     expect(remove).toHaveBeenCalledExactlyOnceWith({ filter: { url: { $eq: url }, userType: { $eq: 'pupil' } } })
     expect(ids()).toEqual([...untouched, ...upsert.mock.calls.at(-1)![0].records.map(v => v.id)])
@@ -105,7 +108,7 @@ describe('ingestUrl', () => {
   })
 
   it.each([false, true])('propagates upsert failure without writing the database (replacement: %s)', async (replacement) => {
-    if (replacement) db.mockResolvedValueOnce({ json: async () => ({ records: [{ _id: 'existing', contentHash: 'old' }] }) })
+    if (replacement) db.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [{ _id: 'existing', contentHash: 'old' }] }) })
     upsert.mockRejectedValueOnce(new Error('Pinecone unavailable'))
     await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Pinecone unavailable')
     expect(db).toHaveBeenCalledTimes(1)
@@ -113,7 +116,7 @@ describe('ingestUrl', () => {
   })
 
   it('continues to reject unchanged normalized content before deleting or upserting', async () => {
-    db.mockResolvedValueOnce({ json: async () => ({ records: [{ contentHash: hash(text.replace(/\s+/g, ' ').trim()) }] }) })
+    db.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [{ contentHash: hash(text.replace(/\s+/g, ' ').trim()) }] }) })
     await expect(ingestUrl(url, 'pupil')).rejects.toThrow('The content of the URL has not changed')
     expect(remove).not.toHaveBeenCalled()
     expect(upsert).not.toHaveBeenCalled()
@@ -128,5 +131,89 @@ describe('ingestUrl', () => {
     vi.mocked(chunkText).mockReturnValueOnce([])
     await expect(ingestUrl(url, 'pupil')).rejects.toThrow('No chunks generated')
     expect(upsert).not.toHaveBeenCalled()
+  })
+})
+
+// These characterize the existing replacement ordering. Activation/rollback is
+// deliberately not assumed: deletion still precedes chunking, embedding and upsert.
+describe('ingestion failure ordering', () => {
+  const existing = { _id: 'existing', url, userType: 'pupil', contentHash: 'oldhash' }
+  const seedOld = () => {
+    stored.set('legacy-id', { id: 'legacy-id', values: [1], metadata: { url, userType: 'pupil', chunk: 'old content' } })
+    db.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [existing] }) })
+  }
+
+  it('leaves old vectors intact when scraping fails', async () => {
+    seedOld()
+    vi.mocked(scrapeUrl).mockRejectedValueOnce(new Error('Scraping failed'))
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Scraping failed')
+    expect(ids()).toEqual(['legacy-id'])
+    expect(db).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('currently deletes old vectors before an embedding failure', async () => {
+    seedOld()
+    vi.mocked(embedChunks).mockRejectedValueOnce(new Error('Embedding failed'))
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Embedding failed')
+    expect(ids()).toEqual([])
+    expect(upsert).not.toHaveBeenCalled()
+    expect(db).toHaveBeenCalledTimes(1)
+  })
+
+  it('currently leaves only the partial upload when replacement upsert times out', async () => {
+    seedOld()
+    upsert.mockImplementationOnce(async ({ records }) => {
+      stored.set(records[0].id, records[0] as Vector)
+      throw new Error('Upload timed out')
+    })
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Upload timed out')
+    expect(stored.size).toBe(1)
+    expect(stored.has('legacy-id')).toBe(false)
+    expect([...stored.values()][0].metadata.chunk).toBe('first chunk')
+    expect(db).toHaveBeenCalledTimes(1)
+  })
+
+  it('propagates legacy-vector deletion failure before embedding or persistence', async () => {
+    seedOld()
+    remove.mockRejectedValueOnce(new Error('Delete failed'))
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Delete failed')
+    expect(ids()).toEqual(['legacy-id'])
+    expect(embedChunks).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
+    expect(db).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([false, true])('rejects DB persistence HTTP errors after upload (existing: %s)', async replacement => {
+    if (replacement) seedOld()
+    else db.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [] }) })
+    db.mockResolvedValueOnce({ ok: false, status: 503 })
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Ingestion persistence failed (503)')
+    expect(stored.size).toBe(2) // Uploaded vectors are not rolled back by current code.
+    expect(db.mock.calls.at(-1)?.[1]?.method).toBe(replacement ? 'PUT' : 'POST')
+  })
+
+  it('propagates a persistence network failure without claiming ingestion succeeded', async () => {
+    db.mockResolvedValueOnce({ ok: true, json: async () => ({ records: [] }) })
+    db.mockRejectedValueOnce(new Error('Database network failure'))
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow('Database network failure')
+    expect(stored.size).toBe(2)
+  })
+
+  it.each([
+    { ok: false, status: 500 },
+    { ok: true, json: async () => ({ records: {} }) },
+    { ok: true, json: async () => { throw new SyntaxError('Malformed JSON') } },
+  ])('does not delete or upload after a bad DB lookup response %j', async response => {
+    db.mockResolvedValueOnce(response)
+    await expect(ingestUrl(url, 'pupil')).rejects.toThrow()
+    expect(remove).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it('treats missing lookup records as a new URL', async () => {
+    db.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    await expect(ingestUrl(url, 'pupil')).resolves.toEqual({ chunks: 2 })
+    expect(db.mock.calls[1][1].method).toBe('POST')
   })
 })

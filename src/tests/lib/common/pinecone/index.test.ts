@@ -223,3 +223,22 @@ describe('queryVectors', () => {
     })
   })
 })
+
+describe('Pinecone error propagation', () => {
+  beforeEach(() => {
+    for (const mock of Object.values(mockIndex)) mock.mockReset()
+  })
+
+  it('propagates upsert failure without deleting any records', async () => {
+    mockIndex.upsert.mockRejectedValueOnce(new Error('Upsert timed out'))
+    await expect(upsertVectors({ vectors: [] })).rejects.toThrow('Upsert timed out')
+    expect(mockIndex.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('propagates deletion and query failures', async () => {
+    mockIndex.deleteMany.mockRejectedValueOnce(new Error('Deletion failed'))
+    await expect(deleteVectors({ filter: { url: { $eq: 'https://example.com' }, userType: { $eq: 'tutor' } } })).rejects.toThrow('Deletion failed')
+    mockIndex.query.mockRejectedValueOnce(new Error('Query failed'))
+    await expect(queryVectors({ embedding: [1], userType: 'tutor' })).rejects.toThrow('Query failed')
+  })
+})
